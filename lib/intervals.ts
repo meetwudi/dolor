@@ -34,6 +34,74 @@ const SourceEnum = z.enum([
 ]);
 const HrLoadTypeEnum = z.enum(["AVG_HR", "HR_ZONES", "HRSS"]);
 const PaceLoadTypeEnum = z.enum(["SWIM", "RUN"]);
+const SportTypeEnum = z.enum([
+  "Ride",
+  "Run",
+  "Swim",
+  "WeightTraining",
+  "Hike",
+  "Walk",
+  "AlpineSki",
+  "BackcountrySki",
+  "Badminton",
+  "Canoeing",
+  "Crossfit",
+  "EBikeRide",
+  "EMountainBikeRide",
+  "Elliptical",
+  "Golf",
+  "GravelRide",
+  "TrackRide",
+  "Handcycle",
+  "HighIntensityIntervalTraining",
+  "Hockey",
+  "IceSkate",
+  "InlineSkate",
+  "Kayaking",
+  "Kitesurf",
+  "MountainBikeRide",
+  "NordicSki",
+  "OpenWaterSwim",
+  "Padel",
+  "Pilates",
+  "Pickleball",
+  "Racquetball",
+  "Rugby",
+  "RockClimbing",
+  "RollerSki",
+  "Rowing",
+  "Sail",
+  "Skateboard",
+  "Snowboard",
+  "Snowshoe",
+  "Soccer",
+  "Squash",
+  "StairStepper",
+  "StandUpPaddling",
+  "Surfing",
+  "TableTennis",
+  "Tennis",
+  "TrailRun",
+  "Transition",
+  "Velomobile",
+  "VirtualRide",
+  "VirtualRow",
+  "VirtualRun",
+  "VirtualSki",
+  "WaterSport",
+  "Wheelchair",
+  "Windsurf",
+  "Workout",
+  "Yoga",
+  "Other",
+]);
+const MenstrualPhaseEnum = z.enum([
+  "PERIOD",
+  "FOLLICULAR",
+  "OVULATING",
+  "LUTEAL",
+  "NONE",
+]);
 
 const GearSchema = z
   .object({
@@ -304,12 +372,74 @@ const ActivitySchema = z.object({
 const ActivityListSchema = z.array(ActivitySchema);
 
 export type Activity = z.infer<typeof ActivitySchema>;
+const WellnessSportInfoSchema = z.object({
+  type: SportTypeEnum,
+  eftp: z.number().nullish(),
+  wPrime: z.number().nullish(),
+  pMax: z.number().nullish(),
+});
+
+const WellnessRecordSchema = z
+  .object({
+    id: z.string(),
+    ctl: z.number().nullish(),
+    atl: z.number().nullish(),
+    rampRate: z.number().nullish(),
+    ctlLoad: z.number().nullish(),
+    atlLoad: z.number().nullish(),
+    sportInfo: z.array(WellnessSportInfoSchema).nullish(),
+    updated: z.string().nullish(),
+    weight: z.number().nullish(),
+    restingHR: z.number().int().nullish(),
+    hrv: z.number().nullish(),
+    hrvSDNN: z.number().nullish(),
+    menstrualPhase: MenstrualPhaseEnum.nullish(),
+    menstrualPhasePredicted: MenstrualPhaseEnum.nullish(),
+    kcalConsumed: z.number().int().nullish(),
+    sleepSecs: z.number().int().nullish(),
+    sleepScore: z.number().nullish(),
+    sleepQuality: z.number().int().nullish(),
+    avgSleepingHR: z.number().nullish(),
+    soreness: z.number().int().nullish(),
+    fatigue: z.number().int().nullish(),
+    stress: z.number().int().nullish(),
+    mood: z.number().int().nullish(),
+    motivation: z.number().int().nullish(),
+    injury: z.number().int().nullish(),
+    spO2: z.number().nullish(),
+    systolic: z.number().int().nullish(),
+    diastolic: z.number().int().nullish(),
+    hydration: z.number().int().nullish(),
+    hydrationVolume: z.number().nullish(),
+    readiness: z.number().nullish(),
+    baevskySI: z.number().nullish(),
+    bloodGlucose: z.number().nullish(),
+    lactate: z.number().nullish(),
+    bodyFat: z.number().nullish(),
+    abdomen: z.number().nullish(),
+    vo2max: z.number().nullish(),
+    comments: z.string().nullish(),
+    steps: z.number().int().nullish(),
+    respiration: z.number().nullish(),
+    locked: z.boolean().nullish(),
+    tempWeight: z.boolean().nullish(),
+    tempRestingHR: z.boolean().nullish(),
+  })
+  .loose();
 
 export interface ListActivitiesParams {
   athleteId: string;
   oldest: string;
   newest: string;
   limit?: number;
+}
+export type WellnessRecord = z.infer<typeof WellnessRecordSchema>;
+export type WellnessRecordUpdate = Partial<WellnessRecord> & { id?: string };
+
+export interface UpdateWellnessRecordParams {
+  athleteId: string;
+  date: string;
+  data: WellnessRecordUpdate;
 }
 
 const DEFAULT_BASE_URL = "https://intervals.icu/api/v1";
@@ -364,6 +494,42 @@ export class IntervalsClient {
       const bDate = b.start_date_local ?? b.start_date ?? "";
       return aDate < bDate ? 1 : -1;
     });
+  }
+
+  async updateWellnessRecord(
+    params: UpdateWellnessRecordParams,
+  ): Promise<WellnessRecord> {
+    const { athleteId, date, data } = params;
+
+    if (!athleteId) throw new Error("athleteId is required");
+    if (!date) throw new Error("date is required");
+    if (!data) throw new Error("data is required");
+
+    const payload = {
+      ...data,
+      id: data.id ?? athleteId,
+    };
+
+    const url = `${this.baseUrl}/athlete/${athleteId}/wellness/${date}`;
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return WellnessRecordSchema.parse(raw);
   }
 }
 

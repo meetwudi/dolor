@@ -1,6 +1,10 @@
 import { tool } from "@openai/agents";
 import { z } from "zod";
-import { IntervalsClient, type Activity } from "./intervals";
+import {
+  IntervalsClient,
+  type Activity,
+  type WellnessRecord,
+} from "./intervals";
 
 const summarizeActivity = (activity: Activity) => ({
   id: activity.id,
@@ -43,5 +47,53 @@ export const listIntervalsActivitiesTool = tool({
       count: activities.length,
       activities: activities.map(summarizeActivity),
     };
+  },
+});
+
+export const updateIntervalsWellnessCommentTool = tool({
+  name: "update_intervals_wellness_comment",
+  description:
+    "Update the wellness comment for an Intervals.icu athlete on a specific date. Use this tool to log notes about the athlete on a given day. Even as small as how they felt.",
+  parameters: z.object({
+    athleteId: z
+      .string()
+      .min(1, "athleteId is required")
+      .describe("Intervals.icu athlete identifier (usually numeric)."),
+    date: z
+      .string()
+      .describe("Date in YYYY-MM-DD format to match the wellness entry."),
+    comments: z
+      .string()
+      .min(1, "comments cannot be empty")
+      .describe("Freeform wellness note to store for that date."),
+  }),
+  execute: async ({ athleteId, date, comments }) => {
+    console.log("[Updating wellness records...]");
+
+    const client = new IntervalsClient();
+    const record = await client.updateWellnessRecord({
+      athleteId,
+      date,
+      data: {
+        id: athleteId,
+        updated: new Date().toISOString(),
+        comments,
+      },
+    });
+
+    const summary: Pick<
+      WellnessRecord,
+      "id" | "comments" | "updated" | "restingHR" | "fatigue" | "mood"
+    > & { date: string } = {
+      id: record.id,
+      comments: record.comments ?? null,
+      updated: record.updated ?? null,
+      restingHR: record.restingHR ?? null,
+      fatigue: record.fatigue ?? null,
+      mood: record.mood ?? null,
+      date,
+    };
+
+    return summary;
   },
 });
