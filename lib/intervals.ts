@@ -1,0 +1,373 @@
+import { Buffer } from "node:buffer";
+import { z } from "zod";
+
+const SubTypeEnum = z.enum(["NONE", "COMMUTE", "WARMUP", "COOLDOWN", "RACE"]);
+const GapModelEnum = z.enum(["NONE", "STRAVA_RUN"]);
+const TizOrderEnum = z.enum([
+  "POWER_HR_PACE",
+  "POWER_PACE_HR",
+  "HR_POWER_PACE",
+  "HR_PACE_POWER",
+  "PACE_POWER_HR",
+  "PACE_HR_POWER",
+]);
+const AchievementTypeEnum = z.enum([
+  "BEST_POWER",
+  "FTP_UP",
+  "LTHR_UP",
+  "BEST_PACE",
+]);
+const SourceEnum = z.enum([
+  "STRAVA",
+  "UPLOAD",
+  "MANUAL",
+  "GARMIN_CONNECT",
+  "OAUTH_CLIENT",
+  "DROPBOX",
+  "POLAR",
+  "SUUNTO",
+  "COROS",
+  "WAHOO",
+  "ZWIFT",
+  "ZEPP",
+  "CONCEPT2",
+]);
+const HrLoadTypeEnum = z.enum(["AVG_HR", "HR_ZONES", "HRSS"]);
+const PaceLoadTypeEnum = z.enum(["SWIM", "RUN"]);
+
+const GearSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]).nullish(),
+    name: z.string().nullish(),
+    distance: z.number().nullish(),
+    primary: z.boolean().nullish(),
+  })
+  .nullish();
+
+const SkylineBytesSchema = z.union([
+  z.array(z.number()),
+  z.string(),
+]);
+
+const HrrSchema = z
+  .object({
+    start_index: z.number().nullish(),
+    end_index: z.number().nullish(),
+    start_time: z.number().nullish(),
+    end_time: z.number().nullish(),
+    start_bpm: z.number().nullish(),
+    end_bpm: z.number().nullish(),
+    average_watts: z.number().nullish(),
+    hrr: z.number().nullish(),
+  })
+  .nullish();
+
+const ActivitySchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  start_date_local: z.string().nullish(),
+  type: z.string().nullish(),
+  icu_ignore_time: z.boolean().nullish(),
+  icu_pm_cp: z.number().nullish(),
+  icu_pm_w_prime: z.number().nullish(),
+  icu_pm_p_max: z.number().nullish(),
+  icu_pm_ftp: z.number().nullish(),
+  icu_pm_ftp_secs: z.number().nullish(),
+  icu_pm_ftp_watts: z.number().nullish(),
+  icu_ignore_power: z.boolean().nullish(),
+  icu_rolling_cp: z.number().nullish(),
+  icu_rolling_w_prime: z.number().nullish(),
+  icu_rolling_p_max: z.number().nullish(),
+  icu_rolling_ftp: z.number().nullish(),
+  icu_rolling_ftp_delta: z.number().nullish(),
+  icu_training_load: z.number().nullish(),
+  icu_atl: z.number().nullish(),
+  icu_ctl: z.number().nullish(),
+  ss_p_max: z.number().nullish(),
+  ss_w_prime: z.number().nullish(),
+  ss_cp: z.number().nullish(),
+  paired_event_id: z.number().nullish(),
+  icu_ftp: z.number().nullish(),
+  icu_joules: z.number().nullish(),
+  icu_recording_time: z.number().nullish(),
+  elapsed_time: z.number().nullish(),
+  icu_weighted_avg_watts: z.number().nullish(),
+  carbs_used: z.number().nullish(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  start_date: z.string().nullish(),
+  distance: z.number().nullish(),
+  icu_distance: z.number().nullish(),
+  moving_time: z.number().nullish(),
+  coasting_time: z.number().nullish(),
+  total_elevation_gain: z.number().nullish(),
+  total_elevation_loss: z.number().nullish(),
+  timezone: z.string().nullish(),
+  trainer: z.boolean().nullish(),
+  sub_type: SubTypeEnum.nullish(),
+  commute: z.boolean().nullish(),
+  race: z.boolean().nullish(),
+  max_speed: z.number().nullish(),
+  average_speed: z.number().nullish(),
+  device_watts: z.boolean().nullish(),
+  has_heartrate: z.boolean().nullish(),
+  max_heartrate: z.number().nullish(),
+  average_heartrate: z.number().nullish(),
+  average_cadence: z.number().nullish(),
+  calories: z.number().nullish(),
+  average_temp: z.number().nullish(),
+  min_temp: z.number().nullish(),
+  max_temp: z.number().nullish(),
+  avg_lr_balance: z.number().nullish(),
+  gap: z.number().nullish(),
+  gap_model: GapModelEnum.nullish(),
+  use_elevation_correction: z.boolean().nullish(),
+  gear: GearSchema,
+  perceived_exertion: z.number().nullish(),
+  device_name: z.string().nullish(),
+  power_meter: z.string().nullish(),
+  power_meter_serial: z.string().nullish(),
+  power_meter_battery: z.string().nullish(),
+  crank_length: z.number().nullish(),
+  external_id: z.string().nullish(),
+  file_sport_index: z.number().nullish(),
+  file_type: z.string().nullish(),
+  icu_athlete_id: z.string().nullish(),
+  created: z.string().nullish(),
+  icu_sync_date: z.string().nullish(),
+  analyzed: z.string().nullish(),
+  icu_w_prime: z.number().nullish(),
+  p_max: z.number().nullish(),
+  threshold_pace: z.number().nullish(),
+  icu_hr_zones: z.array(z.number()).nullish(),
+  pace_zones: z.array(z.number()).nullish(),
+  lthr: z.number().nullish(),
+  icu_resting_hr: z.number().nullish(),
+  icu_weight: z.number().nullish(),
+  icu_power_zones: z.array(z.number()).nullish(),
+  icu_sweet_spot_min: z.number().nullish(),
+  icu_sweet_spot_max: z.number().nullish(),
+  icu_power_spike_threshold: z.number().nullish(),
+  trimp: z.number().nullish(),
+  icu_warmup_time: z.number().nullish(),
+  icu_cooldown_time: z.number().nullish(),
+  icu_chat_id: z.number().nullish(),
+  icu_ignore_hr: z.boolean().nullish(),
+  ignore_velocity: z.boolean().nullish(),
+  ignore_pace: z.boolean().nullish(),
+  ignore_parts: z
+    .array(
+      z.object({
+        start_index: z.number(),
+        end_index: z.number(),
+        power: z.boolean(),
+        pace: z.boolean(),
+        hr: z.boolean(),
+      }),
+    )
+    .nullish(),
+  icu_training_load_data: z.number().nullish(),
+  interval_summary: z.array(z.string()).nullish(),
+  skyline_chart_bytes: SkylineBytesSchema.nullish(),
+  stream_types: z.array(z.string()).nullish(),
+  has_weather: z.boolean().nullish(),
+  has_segments: z.boolean().nullish(),
+  power_field_names: z.array(z.string()).nullish(),
+  power_field: z.string().nullish(),
+  icu_zone_times: z
+    .array(
+      z.object({
+        id: z.string(),
+        secs: z.number(),
+      }),
+    )
+    .nullish(),
+  icu_hr_zone_times: z.array(z.number()).nullish(),
+  pace_zone_times: z.array(z.number()).nullish(),
+  gap_zone_times: z.array(z.number()).nullish(),
+  use_gap_zone_times: z.boolean().nullish(),
+  custom_zones: z
+    .array(
+      z.object({
+        code: z.string(),
+        zones: z.array(
+          z.object({
+            id: z.string(),
+            start: z.number(),
+            end: z.number(),
+            start_value: z.number(),
+            end_value: z.number(),
+            secs: z.number(),
+          }),
+        ),
+      }),
+    )
+    .nullish(),
+  tiz_order: TizOrderEnum.nullish(),
+  polarization_index: z.number().nullish(),
+  icu_achievements: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: AchievementTypeEnum,
+        message: z.string(),
+        watts: z.number().nullish(),
+        secs: z.number().nullish(),
+        value: z.number().nullish(),
+        distance: z.number().nullish(),
+        pace: z.number().nullish(),
+        point: z
+          .object({
+            start_index: z.number(),
+            end_index: z.number(),
+            secs: z.number(),
+            value: z.number(),
+          })
+          .nullish(),
+      }),
+    )
+    .nullish(),
+  icu_intervals_edited: z.boolean().nullish(),
+  lock_intervals: z.boolean().nullish(),
+  icu_lap_count: z.number().nullish(),
+  icu_joules_above_ftp: z.number().nullish(),
+  icu_max_wbal_depletion: z.number().nullish(),
+  icu_hrr: HrrSchema,
+  icu_sync_error: z.string().nullish(),
+  icu_color: z.string().nullish(),
+  icu_power_hr_z2: z.number().nullish(),
+  icu_power_hr_z2_mins: z.number().nullish(),
+  icu_cadence_z2: z.number().nullish(),
+  icu_rpe: z.number().nullish(),
+  feel: z.number().nullish(),
+  kg_lifted: z.number().nullish(),
+  decoupling: z.number().nullish(),
+  icu_median_time_delta: z.number().nullish(),
+  p30s_exponent: z.number().nullish(),
+  workout_shift_secs: z.number().nullish(),
+  strava_id: z.string().nullish(),
+  lengths: z.number().nullish(),
+  pool_length: z.number().nullish(),
+  compliance: z.number().nullish(),
+  coach_tick: z.number().nullish(),
+  source: SourceEnum.nullish(),
+  oauth_client_id: z.number().nullish(),
+  oauth_client_name: z.string().nullish(),
+  average_altitude: z.number().nullish(),
+  min_altitude: z.number().nullish(),
+  max_altitude: z.number().nullish(),
+  power_load: z.number().nullish(),
+  hr_load: z.number().nullish(),
+  pace_load: z.number().nullish(),
+  hr_load_type: HrLoadTypeEnum.nullish(),
+  pace_load_type: PaceLoadTypeEnum.nullish(),
+  tags: z.array(z.string()).nullish(),
+  attachments: z
+    .array(
+      z.object({
+        id: z.string(),
+        filename: z.string(),
+        mimetype: z.string(),
+        url: z.string(),
+      }),
+    )
+    .nullish(),
+  recording_stops: z.array(z.number()).nullish(),
+  average_weather_temp: z.number().nullish(),
+  min_weather_temp: z.number().nullish(),
+  max_weather_temp: z.number().nullish(),
+  average_feels_like: z.number().nullish(),
+  min_feels_like: z.number().nullish(),
+  max_feels_like: z.number().nullish(),
+  average_wind_speed: z.number().nullish(),
+  average_wind_gust: z.number().nullish(),
+  prevailing_wind_deg: z.number().nullish(),
+  headwind_percent: z.number().nullish(),
+  tailwind_percent: z.number().nullish(),
+  average_clouds: z.number().nullish(),
+  max_rain: z.number().nullish(),
+  max_snow: z.number().nullish(),
+  carbs_ingested: z.number().nullish(),
+  route_id: z.number().nullish(),
+  pace: z.number().nullish(),
+  athlete_max_hr: z.number().nullish(),
+  group: z.string().nullish(),
+  icu_intensity: z.number().nullish(),
+  icu_efficiency_factor: z.number().nullish(),
+  icu_power_hr: z.number().nullish(),
+  session_rpe: z.number().nullish(),
+  average_stride: z.number().nullish(),
+  icu_average_watts: z.number().nullish(),
+  icu_variability_index: z.number().nullish(),
+  strain_score: z.number().nullish(),
+}).passthrough();
+
+const ActivityListSchema = z.array(ActivitySchema);
+
+export type Activity = z.infer<typeof ActivitySchema>;
+
+export interface ListActivitiesParams {
+  athleteId: string;
+  oldest: string;
+  newest: string;
+  limit?: number;
+}
+
+const DEFAULT_BASE_URL = "https://intervals.icu/api/v1";
+
+export class IntervalsClient {
+  readonly apiKey: string;
+  readonly baseUrl: string;
+
+  constructor(options?: { apiKey?: string; baseUrl?: string }) {
+    const apiKey = options?.apiKey ?? Bun.env.INTERVALS_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "Missing Intervals.icu API key. Set INTERVALS_API_KEY in your environment.",
+      );
+    }
+
+    this.apiKey = apiKey;
+    this.baseUrl = options?.baseUrl ?? DEFAULT_BASE_URL;
+  }
+
+  async listActivities(params: ListActivitiesParams): Promise<Activity[]> {
+    const { athleteId, oldest, newest, limit } = params;
+
+    if (!athleteId) throw new Error("athleteId is required");
+    if (!oldest) throw new Error("oldest date is required");
+    if (!newest) throw new Error("newest date is required");
+
+    const qs = new URLSearchParams({ oldest, newest });
+    if (typeof limit === "number") {
+      qs.set("limit", limit.toString());
+    }
+
+    const url = `${this.baseUrl}/athlete/${athleteId}/activities?${qs.toString()}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    const activities = ActivityListSchema.parse(raw);
+    return activities.sort((a, b) => {
+      const aDate = a.start_date_local ?? a.start_date ?? "";
+      const bDate = b.start_date_local ?? b.start_date ?? "";
+      return aDate < bDate ? 1 : -1;
+    });
+  }
+}
+
+const encodeApiKey = (apiKey: string) => {
+  const token = Buffer.from(`API_KEY:${apiKey}`);
+  return token.toString("base64");
+};
