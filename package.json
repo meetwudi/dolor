@@ -7,7 +7,7 @@
     "web:dev": "bun --hot web/index.ts",
     "web:start": "NODE_ENV=production bun web/index.ts",
     "build": "bun run build.ts",
-    "agent": "bun scripts/chat-agent.ts",
+    "agent": "bun scripts/chat-agent-cli.ts",
     "lint": "eslint ."
   },
   "dependencies": {
