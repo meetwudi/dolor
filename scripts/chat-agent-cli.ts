@@ -8,14 +8,10 @@
 import readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { parseArgs } from "node:util";
-import {
-  extractAllTextOutput,
-  MemorySession,
-  run,
-  user,
-} from "@openai/agents";
+import { extractAllTextOutput, run, user } from "@openai/agents";
 import { fitnessAgent } from "../lib/fitness-agent";
 import { appendHistory, sendDolorGreeting } from "../lib/dolor-chat";
+import { UpstashSession } from "../lib/upstash-session";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "q", ":q"]);
 
@@ -37,7 +33,7 @@ async function main() {
   const athleteId = parsed.values["athlete-id"];
 
   const rl = readline.createInterface({ input: stdin, output: stdout });
-  const session = new MemorySession();
+  const session = new UpstashSession();
 
   console.log(
     athleteId

@@ -1,7 +1,5 @@
 import {
   extractAllTextOutput,
-  MemorySession,
-  OpenAIConversationsSession,
   run,
   system,
   user,
@@ -15,6 +13,7 @@ import {
   buildIntervalsInstruction,
   sendDolorGreeting,
 } from "../lib/dolor-chat";
+import { UpstashSession } from "../lib/upstash-session";
 
 type TelegramUser = {
   id: number;
@@ -45,12 +44,6 @@ type TelegramUpdate = {
   edited_message?: TelegramMessage;
 };
 
-const IS_PRODUCTION =
-  Bun.env.VERCEL === "1" || Bun.env.NODE_ENV === "production";
-
-const createSession = (): Session =>
-  IS_PRODUCTION ? new OpenAIConversationsSession() : new MemorySession();
-
 type SessionState = {
   session: Session;
   athleteId?: string;
@@ -67,10 +60,13 @@ const getChatKey = (chatId: number, threadId?: number) =>
 const getInstructionKey = (athleteId?: string) =>
   athleteId ? `athlete:${athleteId}` : "athlete:none";
 
+const createSession = (sessionId: string): Session =>
+  new UpstashSession({ sessionId });
+
 const ensureSessionState = (key: string) => {
   let state = sessionStore.get(key);
   if (!state) {
-    state = { session: createSession() };
+    state = { session: createSession(key) };
     sessionStore.set(key, state);
   }
   return state;
@@ -85,7 +81,7 @@ const resetSessionState = async (key: string) => {
       console.warn("Failed to clear previous session", error);
     }
   }
-  const next: SessionState = { session: createSession() };
+  const next: SessionState = { session: createSession(key) };
   sessionStore.set(key, next);
   return next;
 };

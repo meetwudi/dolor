@@ -28,11 +28,12 @@ export type GreetingOptions = {
 
 export const buildIntervalsInstruction = (athleteId?: string) => {
   const intervalsGuidance = athleteId
-    ? `You can query Intervals.icu for athlete ${athleteId}. When calling list_intervals_activities always pass athleteId "${athleteId}" along with explicit oldest/newest dates provided by the athlete.`
-    : "Ask the athlete for their Intervals.icu athlete ID and desired oldest/newest dates before calling list_intervals_activities.";
+    ? `You can query Intervals.icu for athlete ${athleteId}.`
+    : "Ask the athlete for their Intervals.icu athlete ID before calling any intervals.icu tool";
 
   return `${intervalsGuidance}
-- If the user did not ask for a workout, do not suggest a workout.`;
+- If the user did not ask for a workout, do not suggest a workout.
+- Default to the athlete being in San Francisco (America/Los_Angeles); call get_current_time when you need the exact local date or time.`;
 };
 
 export const sendDolorGreeting = async ({
