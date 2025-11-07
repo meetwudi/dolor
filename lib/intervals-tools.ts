@@ -6,6 +6,34 @@ import {
   type WellnessRecord,
 } from "./intervals";
 
+const SAN_FRANCISCO_TZ = "America/Los_Angeles";
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_ACTIVITY_WINDOW_DAYS = 7;
+
+const formatDateInTimeZone = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(date);
+};
+
+const getDefaultActivityDateRange = () => {
+  const now = new Date();
+  const newest = formatDateInTimeZone(now, SAN_FRANCISCO_TZ);
+  const oldest = formatDateInTimeZone(
+    new Date(
+      now.getTime() - (DEFAULT_ACTIVITY_WINDOW_DAYS - 1) * DAY_MS,
+    ),
+    SAN_FRANCISCO_TZ,
+  );
+
+  return { oldest, newest };
+};
+
 const summarizeActivity = (activity: Activity) => ({
   id: activity.id,
   name: activity.name ?? null,
@@ -19,7 +47,7 @@ const summarizeActivity = (activity: Activity) => ({
 export const listIntervalsActivitiesTool = tool({
   name: "list_intervals_activities",
   description:
-    "Fetch Intervals.icu activities for an athlete within a required date range. Returns summary rows (name, start_time, duration, type, power_load/hr_load).",
+    "Fetch Intervals.icu activities for an athlete within a date range. Defaults to the last 7 days ending today in the athlete's San Francisco (America/Los_Angeles) timezone when no dates are given—do NOT ask the user to confirm this fallback. Returns summary rows (name, start_time, duration, type, power_load/hr_load).",
   parameters: z.object({
     athleteId: z
       .string()
@@ -27,23 +55,33 @@ export const listIntervalsActivitiesTool = tool({
       .describe("Intervals.icu athlete identifier (usually numeric)."),
     oldest: z
       .string()
-      .describe("Start date (YYYY-MM-DD)."),
+      .optional()
+      .describe(
+        "Start date (YYYY-MM-DD). Optional; defaults to 6 days prior in America/Los_Angeles.",
+      ),
     newest: z
       .string()
-      .describe("End date (YYYY-MM-DD)."),
+      .optional()
+      .describe(
+        "End date (YYYY-MM-DD). Optional; defaults to today in America/Los_Angeles.",
+      ),
   }),
   execute: async ({ athleteId, oldest, newest }) => {
+    const defaultRange = getDefaultActivityDateRange();
+    const resolvedOldest = oldest ?? defaultRange.oldest;
+    const resolvedNewest = newest ?? defaultRange.newest;
+
     const client = new IntervalsClient();
     const activities = await client.listActivities({
       athleteId,
-      oldest,
-      newest,
+      oldest: resolvedOldest,
+      newest: resolvedNewest,
       limit: 500,
     });
 
     return {
-      oldest,
-      newest,
+      oldest: resolvedOldest,
+      newest: resolvedNewest,
       count: activities.length,
       activities: activities.map(summarizeActivity),
     };
@@ -53,7 +91,7 @@ export const listIntervalsActivitiesTool = tool({
 export const updateIntervalsWellnessCommentTool = tool({
   name: "update_intervals_wellness_comment",
   description:
-    "Update the wellness comment for an Intervals.icu athlete on a specific date. Use this tool to log notes about the athlete on a given day. Even as small as how they felt.",
+    "Update the wellness comment for an Intervals.icu athlete on a specific date. Use this tool to log notes about the athlete on a given day (especially when they volunteer how they're doing today) and do NOT need to re-confirm with them before logging.",
   parameters: z.object({
     athleteId: z
       .string()

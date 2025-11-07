@@ -26,10 +26,14 @@ export type GreetingOptions = {
   athleteId?: string;
 };
 
-export const buildIntervalsInstruction = (athleteId?: string) =>
-  athleteId
+export const buildIntervalsInstruction = (athleteId?: string) => {
+  const intervalsGuidance = athleteId
     ? `You can query Intervals.icu for athlete ${athleteId}. When calling list_intervals_activities always pass athleteId "${athleteId}" along with explicit oldest/newest dates provided by the athlete.`
     : "Ask the athlete for their Intervals.icu athlete ID and desired oldest/newest dates before calling list_intervals_activities.";
+
+  return `${intervalsGuidance}
+- If the user did not ask for a workout, do not suggest a workout.`;
+};
 
 export const sendDolorGreeting = async ({
   session,
