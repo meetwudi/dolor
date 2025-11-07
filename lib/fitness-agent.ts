@@ -1,7 +1,9 @@
 import { Agent, webSearchTool } from "@openai/agents";
 import {
+  addIntervalsActivityCommentTool,
   getIntervalsActivityIntervalsTool,
   listIntervalsActivitiesTool,
+  listIntervalsChatMessagesTool,
   updateIntervalsWellnessCommentTool,
 } from "./intervals-tools";
 import { getCurrentTimeTool } from "./timezone-tool";
@@ -14,6 +16,8 @@ export const fitnessAgent = new Agent({
     listIntervalsActivitiesTool,
     updateIntervalsWellnessCommentTool,
     getIntervalsActivityIntervalsTool,
+    addIntervalsActivityCommentTool,
+    listIntervalsChatMessagesTool,
     getCurrentTimeTool,
     webSearchTool(),
   ],

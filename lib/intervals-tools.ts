@@ -4,6 +4,7 @@ import {
   IntervalsClient,
   type Activity,
   type ActivityIntervals,
+  type ActivityMessage,
   type WellnessRecord,
 } from "./intervals";
 
@@ -45,6 +46,16 @@ const summarizeActivity = (activity: Activity) => ({
   hr_load: activity.hr_load ?? null,
 });
 
+const summarizeChatMessage = (message: ActivityMessage) => ({
+  id: message.id,
+  athlete_id: message.athlete_id ?? null,
+  name: message.name ?? null,
+  created: message.created ?? null,
+  type: message.type ?? null,
+  content: message.content ?? null,
+  activity_id: message.activity_id ?? null,
+});
+
 export const listIntervalsActivitiesTool = tool({
   name: "list_intervals_activities",
   description:
@@ -57,18 +68,22 @@ export const listIntervalsActivitiesTool = tool({
     oldest: z
       .string()
       .describe(
-        "Start date (YYYY-MM-DD). Optional; defaults to 6 days prior in America/Los_Angeles.",
+        'Start date (YYYY-MM-DD). Use an empty string to default to 6 days prior in America/Los_Angeles.',
       ),
     newest: z
       .string()
       .describe(
-        "End date (YYYY-MM-DD). Optional; defaults to today in America/Los_Angeles.",
+        "End date (YYYY-MM-DD). Use an empty string to default to today in America/Los_Angeles.",
       ),
   }),
   execute: async ({ athleteId, oldest, newest }) => {
     const defaultRange = getDefaultActivityDateRange();
-    const resolvedOldest = oldest ?? defaultRange.oldest;
-    const resolvedNewest = newest ?? defaultRange.newest;
+    const resolvedOldest = oldest.trim()
+      ? oldest
+      : defaultRange.oldest;
+    const resolvedNewest = newest.trim()
+      ? newest
+      : defaultRange.newest;
 
     const client = new IntervalsClient();
     const activities = await client.listActivities({
@@ -160,6 +175,71 @@ export const getIntervalsActivityIntervalsTool = tool({
       analyzed: intervals.analyzed ?? null,
       icu_intervals: intervals.icu_intervals ?? [],
       icu_groups: intervals.icu_groups ?? [],
+    };
+  },
+});
+
+export const addIntervalsActivityCommentTool = tool({
+  name: "add_intervals_activity_comment",
+  description:
+    "Post a coaching comment on a specific Intervals.icu activity. Use this to leave feedback or reminders tied to a workout; the athlete will see it in the activity chat.",
+  parameters: z.object({
+    activityId: z
+      .union([z.string(), z.number()])
+      .describe(
+        "Intervals.icu activity identifier (same as returned by list_intervals_activities).",
+      ),
+    content: z
+      .string()
+      .min(1, "content cannot be empty")
+      .describe("The message to post. Keep it concise and actionable."),
+  }),
+  execute: async ({ activityId, content }) => {
+    const client = new IntervalsClient();
+    const result = await client.addActivityMessage({
+      activityId,
+      content,
+    });
+    return {
+      messageId: result.id,
+      chatId: result.new_chat?.id ?? null,
+    };
+  },
+});
+
+export const listIntervalsChatMessagesTool = tool({
+  name: "list_intervals_chat_messages",
+  description:
+    "List the most recent messages from an Intervals.icu chat (e.g., an activity chat). Use this to review what you or the athlete already discussed before adding new guidance.",
+  parameters: z.object({
+    chatId: z
+      .union([z.string(), z.number()])
+      .describe(
+        "Intervals.icu chat identifier (for activity chats this is often activity.icu_chat_id).",
+      ),
+    beforeId: z
+      .string()
+      .describe("Only return messages older than this ID. Provide an empty string to skip."),
+    limit: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe("Maximum number of messages to return. Use 0 to accept the default (30)."),
+  }),
+  execute: async ({ chatId, beforeId, limit }) => {
+    const client = new IntervalsClient();
+    const trimmedBefore = beforeId.trim();
+    const messages = await client.listChatMessages({
+      chatId,
+      beforeId: trimmedBefore.length ? trimmedBefore : undefined,
+      limit: limit && limit > 0 ? limit : undefined,
+    });
+
+    return {
+      chatId: String(chatId),
+      count: messages.length,
+      messages: messages.map(summarizeChatMessage),
     };
   },
 });

@@ -464,6 +464,52 @@ const ActivitySchema = z.object({
 const ActivityListSchema = z.array(ActivitySchema);
 
 export type Activity = z.infer<typeof ActivitySchema>;
+
+const ActivityMessageSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    athlete_id: z.union([z.string(), z.number()]).nullish(),
+    name: z.string().nullish(),
+    created: z.string().nullish(),
+    type: z.string().nullish(),
+    content: z.string().nullish(),
+    activity_id: z.union([z.string(), z.number()]).nullish(),
+    start_index: z.number().nullish(),
+    end_index: z.number().nullish(),
+    answer: z.string().nullish(),
+    activity: ActivitySchema.nullish(),
+    attachment_url: z.string().nullish(),
+    attachment_mime_type: z.string().nullish(),
+    deleted: z.string().nullish(),
+    deleted_by_id: z.union([z.string(), z.number()]).nullish(),
+    join_group_id: z.number().nullish(),
+    accept_coaching_group_id: z.number().nullish(),
+    seen: z.boolean().nullish(),
+  })
+  .loose();
+
+export type ActivityMessage = z.infer<typeof ActivityMessageSchema>;
+const ActivityMessageListSchema = z.array(ActivityMessageSchema);
+
+const CreateActivityMessageResponseSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    new_chat: z
+      .object({
+        id: z.union([z.string(), z.number()]).nullish(),
+        type: z.string().nullish(),
+        activity_id: z.union([z.string(), z.number()]).nullish(),
+        updated: z.string().nullish(),
+        name: z.string().nullish(),
+        description: z.string().nullish(),
+        url: z.string().nullish(),
+        slug: z.string().nullish(),
+      })
+      .loose()
+      .nullish(),
+  })
+  .loose();
+
 const WellnessSportInfoSchema = z.object({
   type: SportTypeEnum,
   eftp: z.number().nullish(),
@@ -654,6 +700,82 @@ export class IntervalsClient {
     }
 
     return result.data;
+  }
+
+  async addActivityMessage(params: {
+    activityId: string | number;
+    content: string;
+  }): Promise<{ id: string; new_chat?: { id?: string | number | null } | null }> {
+    const { activityId, content } = params;
+    if (!activityId && activityId !== 0) {
+      throw new Error("activityId is required");
+    }
+    if (!content?.trim()) {
+      throw new Error("content is required");
+    }
+
+    const url = `${this.baseUrl}/activity/${String(activityId)}/messages`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    const parsed = CreateActivityMessageResponseSchema.parse(raw);
+    return {
+      id: String(parsed.id),
+      new_chat: parsed.new_chat ?? undefined,
+    };
+  }
+
+  async listChatMessages(params: {
+    chatId: string | number;
+    beforeId?: string | number;
+    limit?: number;
+  }): Promise<ActivityMessage[]> {
+    const { chatId, beforeId, limit } = params;
+    if (!chatId && chatId !== 0) {
+      throw new Error("chatId is required");
+    }
+
+    const qs = new URLSearchParams();
+    if (beforeId !== undefined) {
+      qs.set("beforeId", String(beforeId));
+    }
+    if (limit !== undefined) {
+      const clamped = Math.max(1, Math.min(limit, 100));
+      qs.set("limit", String(clamped));
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const url = `${this.baseUrl}/chats/${String(chatId)}/messages${suffix}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return ActivityMessageListSchema.parse(raw);
   }
 }
 
