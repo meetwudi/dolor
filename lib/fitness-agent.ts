@@ -7,7 +7,6 @@ import {
   updateIntervalsWellnessCommentTool,
 } from "./intervals-tools";
 import { getCurrentTimeTool } from "./timezone-tool";
-
 export const fitnessAgent = new Agent({
   name: "Dolor",
   model: "gpt-5",

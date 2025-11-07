@@ -11,6 +11,39 @@ type UpstashSessionOptions = {
 
 const DEFAULT_KEY_PREFIX = "agent-session:";
 
+const LARGE_INTERVAL_TOOLS = new Set([
+  "list_intervals_activities",
+  "get_intervals_activity_intervals",
+  "list_intervals_chat_messages",
+]);
+
+const valueContainsLargeToolName = (
+  value: unknown,
+  seen = new WeakSet<object>(),
+): boolean => {
+  if (typeof value === "string") {
+    return LARGE_INTERVAL_TOOLS.has(value);
+  }
+  if (!value || typeof value !== "object") return false;
+  if (seen.has(value as object)) return false;
+  seen.add(value as object);
+
+  for (const nested of Object.values(value as Record<string, unknown>)) {
+    if (typeof nested === "string" && LARGE_INTERVAL_TOOLS.has(nested)) {
+      return true;
+    }
+    if (valueContainsLargeToolName(nested, seen)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const sanitizeItems = (items: AgentInputItem[]): AgentInputItem[] =>
+  items
+    .filter((item) => !(item && typeof item === "object" && valueContainsLargeToolName(item)))
+    .map((item) => structuredClone(item));
+
 export class UpstashSession implements Session {
   private readonly redis: Redis;
   private readonly sessionId: string;
@@ -31,20 +64,21 @@ export class UpstashSession implements Session {
   async getItems(limit?: number): Promise<AgentInputItem[]> {
     const items = await this.readItems();
     if (limit === undefined) {
-      return cloneAgentItems(items);
+      return sanitizeItems(items);
     }
     if (limit <= 0) {
       return [];
     }
     const start = Math.max(items.length - limit, 0);
-    return cloneAgentItems(items.slice(start));
+    return sanitizeItems(items.slice(start));
   }
 
   async addItems(items: AgentInputItem[]): Promise<void> {
     if (!items.length) return;
     const existing = await this.readItems();
-    const merged = existing.concat(cloneAgentItems(items));
-    await this.writeItems(merged);
+    const merged = [...existing, ...items];
+    const sanitized = sanitizeItems(merged);
+    await this.writeItems(sanitized);
   }
 
   async popItem(): Promise<AgentInputItem | undefined> {
@@ -53,7 +87,7 @@ export class UpstashSession implements Session {
     const popped = items.pop();
     if (!popped) return undefined;
     await this.writeItems(items);
-    return cloneAgentItem(popped);
+    return structuredClone(popped);
   }
 
   async clearSession(): Promise<void> {
@@ -63,7 +97,7 @@ export class UpstashSession implements Session {
   private async readItems(): Promise<AgentInputItem[]> {
     const data = await this.redis.get<AgentInputItem[]>(this.key);
     if (!Array.isArray(data)) return [];
-    return cloneAgentItems(data);
+    return data.map((item) => structuredClone(item));
   }
 
   private async writeItems(items: AgentInputItem[]): Promise<void> {
@@ -71,13 +105,10 @@ export class UpstashSession implements Session {
       await this.redis.del(this.key);
       return;
     }
-    const cloned = cloneAgentItems(items);
-    await this.redis.set(this.key, cloned, this.ttlSeconds ? { ex: this.ttlSeconds } : undefined);
+    await this.redis.set(
+      this.key,
+      items.map((item) => structuredClone(item)),
+      this.ttlSeconds ? { ex: this.ttlSeconds } : undefined,
+    );
   }
 }
-
-const cloneAgentItem = <T extends AgentInputItem>(item: T): T =>
-  structuredClone(item);
-
-const cloneAgentItems = <T extends AgentInputItem>(items: T[]): T[] =>
-  items.map((item) => cloneAgentItem(item));

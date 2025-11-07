@@ -8,12 +8,47 @@
 import readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { parseArgs } from "node:util";
-import { extractAllTextOutput, run, user } from "@openai/agents";
+import { run, user, type StreamedRunResult } from "@openai/agents";
 import { fitnessAgent } from "../lib/fitness-agent";
 import { appendHistory, sendDolorGreeting } from "../lib/dolor-chat";
 import { UpstashSession } from "../lib/upstash-session";
+import {
+  getFinalResponseText,
+  getLogLineFromEvent,
+  getTextDeltaFromEvent,
+} from "../lib/run-stream-utils";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "q", ":q"]);
+
+const streamCliRun = async (
+  result: StreamedRunResult<any, any>,
+) => {
+  let printedAssistantLabel = false;
+  let textBuffer = "";
+  for await (const event of result) {
+    const logLine = getLogLineFromEvent(event, "cli");
+    if (logLine) {
+      stdout.write(`\n${logLine}\n`);
+    }
+    const delta = getTextDeltaFromEvent(event);
+    if (delta) {
+      if (!printedAssistantLabel) {
+        stdout.write("Dolor: ");
+        printedAssistantLabel = true;
+      }
+      textBuffer += delta;
+      stdout.write(delta);
+    }
+  }
+  await result.completed.catch(() => {});
+  if (printedAssistantLabel) {
+    stdout.write("\n\n");
+  }
+  if (!textBuffer.trim()) {
+    const fallback = getFinalResponseText(result);
+    stdout.write(`Dolor: ${fallback.trim()}\n\n`);
+  }
+};
 
 async function main() {
   if (!Bun.env.OPENAI_API_KEY) {
@@ -53,13 +88,9 @@ async function main() {
       const result = await run(fitnessAgent, [user(input)], {
         session,
         sessionInputCallback: appendHistory,
+        stream: true,
       });
-      const reply =
-        typeof result.finalOutput === "string"
-          ? result.finalOutput
-          : extractAllTextOutput(result.newItems) || "[No response]";
-
-      console.log(`Dolor: ${reply.trim()}\n`);
+      await streamCliRun(result as any);
     } catch (error) {
       console.error(
         `Dolor (error): ${error instanceof Error ? error.message : String(error)}`,

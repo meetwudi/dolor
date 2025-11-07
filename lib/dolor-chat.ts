@@ -9,17 +9,60 @@ import {
 } from "@openai/agents";
 import { fitnessAgent } from "./fitness-agent";
 
-export const appendHistory: SessionInputCallback = (history, newItems) => [
-  // Filter out type: "reasoning" that is not followed by type: "message"
-  // https://github.com/openai/codex/issues/5990
-  ...history.filter((item, index, arr) => {
+const LARGE_INTERVAL_TOOLS = new Set([
+  "list_intervals_activities",
+  "get_intervals_activity_intervals",
+  "list_intervals_chat_messages",
+]);
+
+const valueContainsLargeToolName = (
+  value: unknown,
+  seen = new WeakSet<object>(),
+): boolean => {
+  if (typeof value === "string") {
+    return LARGE_INTERVAL_TOOLS.has(value);
+  }
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
+  if (seen.has(obj)) return false;
+  seen.add(obj);
+
+  for (const key of Object.keys(obj)) {
+    const field = obj[key];
+    if (typeof field === "string" && LARGE_INTERVAL_TOOLS.has(field)) {
+      return true;
+    }
+    if (valueContainsLargeToolName(field, seen)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const dropLargeToolOutputs = (items: AgentInputItem[]) =>
+  items.filter((item) => {
+    if (item && typeof item === "object" && valueContainsLargeToolName(item)) {
+      return false;
+    }
+    return true;
+  });
+
+const removeOrphanReasoning = (items: AgentInputItem[]) =>
+  items.filter((item, index, arr) => {
     if (item.type !== "reasoning") return true;
     if (index >= arr.length - 1) return false;
     const nextItem = arr[index + 1];
     return nextItem?.type === "message";
-  }),
-  ...newItems,
-];
+  });
+
+export const appendHistory: SessionInputCallback = (history, newItems) => {
+  const cleanedHistory = removeOrphanReasoning(dropLargeToolOutputs(history));
+  const cleanedNewItems = removeOrphanReasoning(dropLargeToolOutputs(newItems));
+
+  return [...cleanedHistory, ...cleanedNewItems];
+};
 
 export type GreetingOptions = {
   session: Session;
