@@ -52,7 +52,7 @@ type SessionState = {
 };
 
 const TELEGRAM_CHAR_LIMIT = 4096;
-const UPDATE_DEDUPE_TTL_SECONDS = 60;
+const UPDATE_DEDUPE_TTL_SECONDS = 600;
 const redis = Redis.fromEnv();
 
 const sessionStore = new Map<string, SessionState>();
