@@ -55,13 +55,11 @@ export const listIntervalsActivitiesTool = tool({
       .describe("Intervals.icu athlete identifier (usually numeric)."),
     oldest: z
       .string()
-      .optional()
       .describe(
         "Start date (YYYY-MM-DD). Optional; defaults to 6 days prior in America/Los_Angeles.",
       ),
     newest: z
       .string()
-      .optional()
       .describe(
         "End date (YYYY-MM-DD). Optional; defaults to today in America/Los_Angeles.",
       ),
