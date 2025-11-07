@@ -1,6 +1,6 @@
 import {
   extractAllTextOutput,
-  MemorySession,
+  Session,
   run,
   system,
   user,
@@ -22,7 +22,7 @@ export const appendHistory: SessionInputCallback = (history, newItems) => [
 ];
 
 export type GreetingOptions = {
-  session: MemorySession;
+  session: Session;
   athleteId?: string;
 };
 

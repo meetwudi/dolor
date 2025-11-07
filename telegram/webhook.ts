@@ -1,11 +1,13 @@
 import {
   extractAllTextOutput,
   MemorySession,
+  OpenAIConversationsSession,
   run,
   system,
   user,
   type Agent,
   type RunResult,
+  type Session,
 } from "@openai/agents";
 import { fitnessAgent } from "../lib/fitness-agent";
 import {
@@ -43,8 +45,14 @@ type TelegramUpdate = {
   edited_message?: TelegramMessage;
 };
 
+const IS_PRODUCTION =
+  Bun.env.VERCEL === "1" || Bun.env.NODE_ENV === "production";
+
+const createSession = (): Session =>
+  IS_PRODUCTION ? new OpenAIConversationsSession() : new MemorySession();
+
 type SessionState = {
-  session: MemorySession;
+  session: Session;
   athleteId?: string;
   lastInstructionKey?: string;
 };
@@ -62,14 +70,22 @@ const getInstructionKey = (athleteId?: string) =>
 const ensureSessionState = (key: string) => {
   let state = sessionStore.get(key);
   if (!state) {
-    state = { session: new MemorySession() };
+    state = { session: createSession() };
     sessionStore.set(key, state);
   }
   return state;
 };
 
-const resetSessionState = (key: string) => {
-  const next: SessionState = { session: new MemorySession() };
+const resetSessionState = async (key: string) => {
+  const previous = sessionStore.get(key);
+  if (previous) {
+    try {
+      await previous.session.clearSession();
+    } catch (error) {
+      console.warn("Failed to clear previous session", error);
+    }
+  }
+  const next: SessionState = { session: createSession() };
   sessionStore.set(key, next);
   return next;
 };
@@ -211,7 +227,7 @@ export const createTelegramWebhookHandler = ({
         return true;
       }
       case "/reset": {
-        resetSessionState(key);
+        await resetSessionState(key);
         await sendTextResponse(
           apiBaseUrl,
           chatId,
