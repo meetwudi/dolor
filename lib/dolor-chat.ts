@@ -1,6 +1,6 @@
 import {
   extractAllTextOutput,
-  Session,
+  type Session,
   run,
   system,
   user,
