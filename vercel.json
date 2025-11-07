@@ -4,7 +4,7 @@
   "buildCommand": "bun run build",
   "functions": {
     "api/telegram.ts": {
-      "runtime": "bun"
+      "runtime": "vercel-bun@1.0.2"
     }
   },
   "rewrites": [
