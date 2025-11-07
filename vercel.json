@@ -1,11 +1,10 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "functions": {
-    "api/telegram.ts": {
-      "runtime": "vercel-bun@1.0.2"
-    }
+    "runtime": "nodejs22.x"
   },
   "rewrites": [
     {
