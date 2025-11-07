@@ -7,6 +7,7 @@ import {
   type RunResult,
   type Session,
 } from "@openai/agents";
+import { Redis } from "@upstash/redis";
 import { fitnessAgent } from "../lib/fitness-agent";
 import {
   appendHistory,
@@ -51,8 +52,24 @@ type SessionState = {
 };
 
 const TELEGRAM_CHAR_LIMIT = 4096;
+const UPDATE_DEDUPE_TTL_SECONDS = 60;
+const redis = Redis.fromEnv();
 
 const sessionStore = new Map<string, SessionState>();
+
+const claimUpdateLock = async (updateId: number) => {
+  const key = `telegram:update:${updateId}`;
+  try {
+    const result = await redis.set(key, "1", {
+      nx: true,
+      ex: UPDATE_DEDUPE_TTL_SECONDS,
+    });
+    return result === "OK";
+  } catch (error) {
+    console.warn("Failed to claim update lock; proceeding without dedupe", error);
+    return true;
+  }
+};
 
 const getChatKey = (chatId: number, threadId?: number) =>
   threadId ? `${chatId}:${threadId}` : String(chatId);
@@ -283,6 +300,11 @@ export const createTelegramWebhookHandler = ({
     } catch (error) {
       console.error("Failed to parse Telegram payload", error);
       return new Response("Bad Request", { status: 400 });
+    }
+
+    const lockAcquired = await claimUpdateLock(update.update_id);
+    if (!lockAcquired) {
+      return new Response("Duplicate update", { status: 200 });
     }
 
     const message = update.message ?? update.edited_message;
