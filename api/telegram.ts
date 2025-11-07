@@ -9,7 +9,7 @@ const handler = createTelegramWebhookHandler({
 });
 
 export const config = {
-  runtime: "bun",
+  runtime: "nodejs",
 };
 
 export default function (request: Request) {
