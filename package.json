@@ -8,6 +8,7 @@
     "web:start": "NODE_ENV=production bun web/index.ts",
     "build": "bun run build.ts",
     "agent": "bun scripts/chat-agent-cli.ts",
+    "telegram:dev": "bun --hot scripts/telegram-server.ts",
     "lint": "eslint ."
   },
   "dependencies": {

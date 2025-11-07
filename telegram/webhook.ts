@@ -1,0 +1,333 @@
+import {
+  extractAllTextOutput,
+  MemorySession,
+  run,
+  system,
+  user,
+  type Agent,
+  type RunResult,
+} from "@openai/agents";
+import { fitnessAgent } from "../lib/fitness-agent";
+import {
+  appendHistory,
+  buildIntervalsInstruction,
+  sendDolorGreeting,
+} from "../lib/dolor-chat";
+
+type TelegramUser = {
+  id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+};
+
+type TelegramChat = {
+  id: number;
+  type: string;
+  title?: string;
+  username?: string;
+};
+
+type TelegramMessage = {
+  message_id: number;
+  text?: string;
+  from?: TelegramUser;
+  chat: TelegramChat;
+  date: number;
+  message_thread_id?: number;
+};
+
+type TelegramUpdate = {
+  update_id: number;
+  message?: TelegramMessage;
+  edited_message?: TelegramMessage;
+};
+
+type SessionState = {
+  session: MemorySession;
+  athleteId?: string;
+  lastInstructionKey?: string;
+};
+
+const TELEGRAM_CHAR_LIMIT = 4096;
+
+const sessionStore = new Map<string, SessionState>();
+
+const getChatKey = (chatId: number, threadId?: number) =>
+  threadId ? `${chatId}:${threadId}` : String(chatId);
+
+const getInstructionKey = (athleteId?: string) =>
+  athleteId ? `athlete:${athleteId}` : "athlete:none";
+
+const ensureSessionState = (key: string) => {
+  let state = sessionStore.get(key);
+  if (!state) {
+    state = { session: new MemorySession() };
+    sessionStore.set(key, state);
+  }
+  return state;
+};
+
+const resetSessionState = (key: string) => {
+  const next: SessionState = { session: new MemorySession() };
+  sessionStore.set(key, next);
+  return next;
+};
+
+const ensureIntervalsInstruction = async (state: SessionState) => {
+  const instructionKey = getInstructionKey(state.athleteId);
+  if (state.lastInstructionKey === instructionKey) return;
+
+  await state.session.addItems([system(buildIntervalsInstruction(state.athleteId))]);
+  state.lastInstructionKey = instructionKey;
+};
+
+const chunkMessage = (text: string) => {
+  const chunks: string[] = [];
+  let remaining = text.trim();
+
+  while (remaining.length > TELEGRAM_CHAR_LIMIT) {
+    let slice = remaining.slice(0, TELEGRAM_CHAR_LIMIT);
+    const lastBreak = slice.lastIndexOf("\n");
+    if (lastBreak > TELEGRAM_CHAR_LIMIT * 0.5) {
+      slice = slice.slice(0, lastBreak);
+    }
+    chunks.push(slice.trim());
+    remaining = remaining.slice(slice.length).trimStart();
+  }
+
+  if (remaining.length) {
+    chunks.push(remaining);
+  }
+
+  return chunks;
+};
+
+const sendTelegramMessage = async (
+  apiBaseUrl: string,
+  payload: Record<string, unknown>,
+) => {
+  const response = await fetch(`${apiBaseUrl}/sendMessage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("Telegram sendMessage failed", response.status, body);
+  }
+};
+
+const sendTextResponse = async (
+  apiBaseUrl: string,
+  chatId: number,
+  text: string,
+  replyTo?: number,
+) => {
+  const chunks = chunkMessage(text);
+
+  for (const chunk of chunks) {
+    await sendTelegramMessage(apiBaseUrl, {
+      chat_id: chatId,
+      text: chunk,
+      reply_to_message_id: replyTo,
+      disable_notification: false,
+      disable_web_page_preview: true,
+    });
+    // Only the first chunk should reply to the triggering message.
+    replyTo = undefined;
+  }
+};
+
+type AnyRunResult = RunResult<any, Agent<any, any>>;
+
+const formatReply = (result: AnyRunResult) =>
+  typeof result.finalOutput === "string"
+    ? result.finalOutput
+    : extractAllTextOutput(result.newItems) || "[No response]";
+
+const parseCommand = (text: string) => {
+  if (!text.startsWith("/")) return null;
+  const trimmed = text.trim();
+  const [rawCommand, ...args] = trimmed.split(/\s+/);
+  if (!rawCommand) return null;
+  const command = rawCommand.toLowerCase();
+  return { command, args };
+};
+
+export type TelegramWebhookHandlerOptions = {
+  botToken: string;
+  secretToken?: string;
+};
+
+export const createTelegramWebhookHandler = ({
+  botToken,
+  secretToken,
+}: TelegramWebhookHandlerOptions) => {
+  if (!botToken) {
+    throw new Error("createTelegramWebhookHandler requires a TELEGRAM_BOT_TOKEN");
+  }
+
+  if (!Bun.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY must be set to chat with Dolor.");
+  }
+
+  const apiBaseUrl = `https://api.telegram.org/bot${botToken}`;
+
+  const handleCommand = async (
+    chatId: number,
+    key: string,
+    command: string,
+    args: string[],
+    messageId: number,
+  ) => {
+    switch (command) {
+      case "/start": {
+        const state = ensureSessionState(key);
+        const greeting = await sendDolorGreeting({
+          session: state.session,
+          athleteId: state.athleteId,
+        });
+        state.lastInstructionKey = getInstructionKey(state.athleteId);
+        await sendTextResponse(apiBaseUrl, chatId, greeting, messageId);
+        await sendTextResponse(
+          apiBaseUrl,
+          chatId,
+          "You can set your Intervals.icu athlete ID any time with /athlete <id>. Use /help to see all commands.",
+        );
+        return true;
+      }
+      case "/help": {
+        const helpMessage = [
+          "Available commands:",
+          "/start — receive Dolor's greeting and current context",
+          "/athlete <id> — pin an Intervals.icu athlete for tool calls",
+          "/reset — drop the current chat history",
+        ].join("\n");
+        await sendTextResponse(apiBaseUrl, chatId, helpMessage, messageId);
+        return true;
+      }
+      case "/reset": {
+        resetSessionState(key);
+        await sendTextResponse(
+          apiBaseUrl,
+          chatId,
+          "Cleared Dolor's memory for this chat. Start fresh!",
+          messageId,
+        );
+        return true;
+      }
+      case "/athlete": {
+        const athleteId = args[0];
+        if (!athleteId) {
+          await sendTextResponse(
+            apiBaseUrl,
+            chatId,
+            "Usage: /athlete <id>",
+            messageId,
+          );
+          return true;
+        }
+        const state = ensureSessionState(key);
+        state.athleteId = athleteId;
+        state.lastInstructionKey = undefined;
+        await sendTextResponse(
+          apiBaseUrl,
+          chatId,
+          `Got it. I'll use athlete ID ${athleteId} the next time Dolor calls Intervals.icu.`,
+          messageId,
+        );
+        return true;
+      }
+      default:
+        return false;
+    }
+  };
+
+  return async (request: Request) => {
+    if (request.method === "GET") {
+      return new Response(
+        "Dolor Telegram webhook is up. Configure Telegram to POST updates to this URL.",
+      );
+    }
+
+    if (request.method !== "POST") {
+      return new Response("Method Not Allowed", { status: 405 });
+    }
+
+    if (
+      secretToken &&
+      request.headers.get("x-telegram-bot-api-secret-token") !== secretToken
+    ) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    let update: TelegramUpdate;
+    try {
+      update = await request.json();
+    } catch (error) {
+      console.error("Failed to parse Telegram payload", error);
+      return new Response("Bad Request", { status: 400 });
+    }
+
+    const message = update.message ?? update.edited_message;
+    if (!message) {
+      return new Response("No message to process", { status: 200 });
+    }
+
+    const text = message.text?.trim();
+    if (!text) {
+      await sendTextResponse(
+        apiBaseUrl,
+        message.chat.id,
+        "Dolor can only read text messages for now.",
+        message.message_id,
+      );
+      return new Response("OK");
+    }
+
+    const chatKey = getChatKey(message.chat.id, message.message_thread_id);
+
+    const command = parseCommand(text);
+    if (command) {
+      const handled = await handleCommand(
+        message.chat.id,
+        chatKey,
+        command.command,
+        command.args,
+        message.message_id,
+      );
+      if (handled) return new Response("OK");
+    }
+
+    const state = ensureSessionState(chatKey);
+    await ensureIntervalsInstruction(state);
+
+    try {
+      const result = await run(fitnessAgent, [user(text)], {
+        session: state.session,
+        sessionInputCallback: appendHistory,
+      });
+      const reply = formatReply(result).trim();
+      await sendTextResponse(
+        apiBaseUrl,
+        message.chat.id,
+        reply,
+        message.message_id,
+      );
+    } catch (error) {
+      console.error("Dolor Telegram run failed", error);
+      await sendTextResponse(
+        apiBaseUrl,
+        message.chat.id,
+        "Dolor hit an error. Please try again in a moment.",
+        message.message_id,
+      );
+    }
+
+    return new Response("OK");
+  };
+};

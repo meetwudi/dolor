@@ -12,18 +12,12 @@ import {
   extractAllTextOutput,
   MemorySession,
   run,
-  system,
   user,
-  type AgentInputItem,
-  type SessionInputCallback,
 } from "@openai/agents";
 import { fitnessAgent } from "../lib/fitness-agent";
+import { appendHistory, sendDolorGreeting } from "../lib/dolor-chat";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "q", ":q"]);
-const appendHistory: SessionInputCallback = (history, newItems) => [
-  ...history,
-  ...newItems,
-];
 
 async function main() {
   if (!Bun.env.OPENAI_API_KEY) {
@@ -51,7 +45,8 @@ async function main() {
       : "Chatting with Dolor. Pass --athlete-id <id> to auto-fill tool calls. Type 'exit' to leave.\n",
   );
 
-  await sendDolorGreeting({ session, athleteId });
+  const greeting = await sendDolorGreeting({ session, athleteId });
+  console.log(`Dolor: ${greeting.trim()}\n`);
 
   while (true) {
     const input = (await rl.question("me: ")).trim();
@@ -78,35 +73,6 @@ async function main() {
 
   rl.close();
 }
-
-type GreetingOptions = {
-  session: MemorySession;
-  athleteId?: string;
-};
-
-const sendDolorGreeting = async ({ session, athleteId }: GreetingOptions) => {
-  const items: AgentInputItem[] = [
-    system(
-      athleteId
-        ? `You can query Intervals.icu for athlete ${athleteId}. When calling list_intervals_activities always pass athleteId "${athleteId}" along with explicit oldest/newest dates provided by the athlete.`
-        : "Ask the athlete for their Intervals.icu athlete ID and desired oldest/newest dates before calling list_intervals_activities.",
-    ),
-    user(
-      "Start the session with a concise, encouraging greeting and invite the athlete to share what they need help with today.",
-    ),
-  ];
-
-  const result = await run(fitnessAgent, items, {
-    session,
-    sessionInputCallback: appendHistory,
-  });
-  const reply =
-    typeof result.finalOutput === "string"
-      ? result.finalOutput
-      : extractAllTextOutput(result.newItems) || "[No response]";
-
-  console.log(`Dolor: ${reply.trim()}\n`);
-};
 
 main().catch((error) => {
   console.error(error);

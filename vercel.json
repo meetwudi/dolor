@@ -1,0 +1,16 @@
+{
+  "framework": null,
+  "installCommand": "bun install",
+  "buildCommand": "bun run build",
+  "functions": {
+    "api/telegram.ts": {
+      "runtime": "bun"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/telegram",
+      "destination": "/api/telegram"
+    }
+  ]
+}
