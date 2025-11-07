@@ -10,7 +10,14 @@ import {
 import { fitnessAgent } from "./fitness-agent";
 
 export const appendHistory: SessionInputCallback = (history, newItems) => [
-  ...history,
+  // Filter out type: "reasoning" that is not followed by type: "message"
+  // https://github.com/openai/codex/issues/5990
+  ...history.filter((item, index, arr) => {
+    if (item.type !== "reasoning") return true;
+    if (index >= arr.length - 1) return false;
+    const nextItem = arr[index + 1];
+    return nextItem?.type === "message";
+  }),
   ...newItems,
 ];
 
