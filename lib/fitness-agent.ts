@@ -1,5 +1,6 @@
 import { Agent, webSearchTool } from "@openai/agents";
 import {
+  getIntervalsActivityIntervalsTool,
   listIntervalsActivitiesTool,
   updateIntervalsWellnessCommentTool,
 } from "./intervals-tools";
@@ -12,6 +13,7 @@ export const fitnessAgent = new Agent({
   tools: [
     listIntervalsActivitiesTool,
     updateIntervalsWellnessCommentTool,
+    getIntervalsActivityIntervalsTool,
     getCurrentTimeTool,
     webSearchTool(),
   ],

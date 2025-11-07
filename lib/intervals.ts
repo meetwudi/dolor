@@ -130,6 +130,98 @@ const HrrSchema = z
   })
   .nullish();
 
+const ActivityIntervalSchema = z
+  .object({
+    start_index: z.number().nullish(),
+    distance: z.number().nullish(),
+    moving_time: z.number().nullish(),
+    elapsed_time: z.number().nullish(),
+    average_watts: z.number().nullish(),
+    average_watts_alt: z.number().nullish(),
+    average_watts_alt_acc: z.number().nullish(),
+    min_watts: z.number().nullish(),
+    max_watts: z.number().nullish(),
+    average_watts_kg: z.number().nullish(),
+    max_watts_kg: z.number().nullish(),
+    intensity: z.number().nullish(),
+    w5s_variability: z.number().nullish(),
+    weighted_average_watts: z.number().nullish(),
+    training_load: z.number().nullish(),
+    joules: z.number().nullish(),
+    joules_above_ftp: z.number().nullish(),
+    decoupling: z.union([z.number(), z.string()]).nullish(),
+    avg_lr_balance: z.number().nullish(),
+    average_dfa_a1: z.number().nullish(),
+    average_epoc: z.number().nullish(),
+    wbal_start: z.number().nullish(),
+    wbal_end: z.number().nullish(),
+    average_respiration: z.number().nullish(),
+    average_tidal_volume: z.number().nullish(),
+    average_tidal_volume_min: z.number().nullish(),
+    zone: z.number().nullish(),
+    zone_min_watts: z.number().nullish(),
+    zone_max_watts: z.number().nullish(),
+    average_speed: z.number().nullish(),
+    min_speed: z.number().nullish(),
+    max_speed: z.number().nullish(),
+    gap: z.number().nullish(),
+    average_heartrate: z.number().nullish(),
+    min_heartrate: z.number().nullish(),
+    max_heartrate: z.number().nullish(),
+    average_cadence: z.number().nullish(),
+    min_cadence: z.number().nullish(),
+    max_cadence: z.number().nullish(),
+    average_torque: z.number().nullish(),
+    min_torque: z.number().nullish(),
+    max_torque: z.number().nullish(),
+    total_elevation_gain: z.number().nullish(),
+    min_altitude: z.number().nullish(),
+    max_altitude: z.number().nullish(),
+    average_gradient: z.number().nullish(),
+    average_smo2: z.number().nullish(),
+    average_thb: z.number().nullish(),
+    average_smo2_2: z.number().nullish(),
+    average_thb_2: z.number().nullish(),
+    average_temp: z.number().nullish(),
+    average_weather_temp: z.number().nullish(),
+    average_feels_like: z.number().nullish(),
+    average_wind_speed: z.number().nullish(),
+    average_wind_gust: z.number().nullish(),
+    prevailing_wind_deg: z.number().nullish(),
+    average_yaw: z.number().nullish(),
+    headwind_percent: z.number().nullish(),
+    tailwind_percent: z.number().nullish(),
+    strain_score: z.number().nullish(),
+    ss_p_max: z.number().nullish(),
+    ss_w_prime: z.number().nullish(),
+    ss_cp: z.number().nullish(),
+    id: z.union([z.string(), z.number()]).nullish(),
+    type: z.enum(["RECOVERY", "WORK"]).nullish(),
+    end_index: z.number().nullish(),
+    group_id: z.string().nullish(),
+    segment_effort_ids: z.array(z.number()).nullish(),
+    start_time: z.number().nullish(),
+    end_time: z.number().nullish(),
+    label: z.string().nullish(),
+    average_stride: z.number().nullish(),
+  })
+  .loose();
+
+const ActivityIntervalGroupSchema = ActivityIntervalSchema.extend({
+  count: z.number().nullish(),
+}).loose();
+
+const ActivityIntervalsSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]).nullish(),
+    analyzed: z.string().nullish(),
+    icu_intervals: z.array(ActivityIntervalSchema).nullish(),
+    icu_groups: z.array(ActivityIntervalGroupSchema).nullish(),
+  })
+  .loose();
+
+export type ActivityIntervals = z.infer<typeof ActivityIntervalsSchema>;
+
 const ActivitySchema = z.object({
   id: z.union([z.number(), z.string()]),
   start_date_local: z.string().nullish(),
@@ -367,7 +459,7 @@ const ActivitySchema = z.object({
   icu_average_watts: z.number().nullish(),
   icu_variability_index: z.number().nullish(),
   strain_score: z.number().nullish(),
-}).passthrough();
+}).loose();
 
 const ActivityListSchema = z.array(ActivitySchema);
 
@@ -530,6 +622,38 @@ export class IntervalsClient {
 
     const raw = await response.json();
     return WellnessRecordSchema.parse(raw);
+  }
+
+  async getActivityIntervals(activityId: string | number): Promise<ActivityIntervals> {
+    if (!activityId && activityId !== 0) {
+      throw new Error("activityId is required");
+    }
+
+    const id = String(activityId);
+    const url = `${this.baseUrl}/activity/${id}/intervals`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    const result = ActivityIntervalsSchema.safeParse(raw);
+
+    if (!result.success) {
+      console.log("Failed to parse ActivityIntervals:", result.error);
+      throw new Error("Failed to parse ActivityIntervals from Intervals.icu");
+    }
+
+    return result.data;
   }
 }
 

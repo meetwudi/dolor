@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   IntervalsClient,
   type Activity,
+  type ActivityIntervals,
   type WellnessRecord,
 } from "./intervals";
 
@@ -131,5 +132,34 @@ export const updateIntervalsWellnessCommentTool = tool({
     };
 
     return summary;
+  },
+});
+
+export const getIntervalsActivityIntervalsTool = tool({
+  name: "get_intervals_activity_intervals",
+  description:
+    "Fetch the full interval breakdown (icu_intervals and icu_groups) for a specific Intervals.icu activity. Use this when you need detailed workout interval performance metrics like power, cadence, heart rate, or strain for targeted coaching.",
+  parameters: z.object({
+    activityId: z
+      .union([z.string(), z.number()])
+      .describe(
+        "Intervals.icu activity identifier. You can get it from list_intervals_activities or the athlete directly.",
+      ),
+  }),
+  execute: async ({ activityId }) => {
+    const client = new IntervalsClient();
+    const resolvedId =
+      typeof activityId === "number" ? activityId.toString() : activityId;
+    if (!resolvedId) {
+      throw new Error("activityId is required");
+    }
+    const intervals: ActivityIntervals =
+      await client.getActivityIntervals(resolvedId);
+    return {
+      activityId: resolvedId,
+      analyzed: intervals.analyzed ?? null,
+      icu_intervals: intervals.icu_intervals ?? [],
+      icu_groups: intervals.icu_groups ?? [],
+    };
   },
 });
