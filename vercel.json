@@ -3,9 +3,7 @@
   "framework": null,
   "installCommand": "bun install",
   "buildCommand": "bun run build",
-  "functions": {
-    "runtime": "nodejs22.x"
-  },
+  "bunVersion": "1.x",
   "rewrites": [
     {
       "source": "/api/telegram",
