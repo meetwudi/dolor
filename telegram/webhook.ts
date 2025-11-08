@@ -1,12 +1,4 @@
-import {
-  run,
-  system,
-  user,
-  type Agent,
-  type RunStreamEvent,
-  type Session,
-  type StreamedRunResult,
-} from "@openai/agents";
+import { run, system, user, type Agent, type Session } from "@openai/agents";
 import { Redis } from "@upstash/redis";
 import { fitnessAgent } from "../lib/fitness-agent";
 import {
@@ -15,11 +7,7 @@ import {
   sendDolorGreeting,
 } from "../lib/dolor-chat";
 import { UpstashSession } from "../lib/upstash-session";
-import {
-  getFinalResponseText,
-  getLogLineFromEvent,
-  getTextDeltaFromEvent,
-} from "../lib/run-stream-utils";
+import { getFinalResponseText, getLogLineFromEvent } from "../lib/run-stream-utils";
 import { withSessionContext } from "../lib/session-context";
 import isProduction from "../lib/environment";
 
@@ -202,32 +190,6 @@ const sendTextResponse = async (
   }
 };
 
-const streamTelegramRunResult = async (
-  apiBaseUrl: string,
-  chatId: number,
-  replyTo: number | undefined,
-  result: StreamedRunResult<any, any>,
-) => {
-  let assistantText = "";
-  try {
-    for await (const event of result as AsyncIterable<RunStreamEvent>) {
-      const delta = getTextDeltaFromEvent(event);
-      if (delta) {
-        assistantText += delta;
-      }
-    }
-    await result.completed;
-  } catch (error) {
-    console.warn("Telegram streaming failed", error);
-  }
-
-  const fallback = (await getFinalResponseText(result)).trim();
-  const finalText = assistantText.trim() || fallback;
-  if (finalText) {
-    await sendTextResponse(apiBaseUrl, chatId, finalText, replyTo);
-  }
-};
-
 const parseCommand = (text: string) => {
   if (!text.startsWith("/")) return null;
   const trimmed = text.trim();
@@ -396,15 +358,12 @@ export const createTelegramWebhookHandler = ({
         run(fitnessAgent, [user(text)], {
           session: state.session,
           sessionInputCallback: appendHistory,
-          stream: true,
         }),
       );
-      await streamTelegramRunResult(
-        apiBaseUrl,
-        message.chat.id,
-        message.message_id,
-        result,
-      );
+      const reply = (await getFinalResponseText(result)).trim();
+      if (reply) {
+        await sendTextResponse(apiBaseUrl, message.chat.id, reply, message.message_id);
+      }
     } catch (error) {
       console.error("Dolor Telegram run failed", error);
       await sendTextResponse(
