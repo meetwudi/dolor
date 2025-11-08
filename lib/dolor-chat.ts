@@ -108,5 +108,6 @@ export const sendDolorGreeting = async ({
 
   return typeof result.finalOutput === "string"
     ? result.finalOutput
-    : extractAllTextOutput(result.newItems) || "[No response]";
+    : extractAllTextOutput(result.newItems) ||
+        "Hello! I'm ready to help—what do you need today?";
 };

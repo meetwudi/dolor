@@ -274,9 +274,15 @@ export const getLogLineFromEvent = (
   return "";
 };
 
-export const getFinalResponseText = (
+export const getFinalResponseText = async (
   result: RunResult<any, any> | StreamedRunResult<any, any>,
-) =>
-  typeof result.finalOutput === "string"
-    ? result.finalOutput
-    : extractAllTextOutput(result.newItems) || "[No response]";
+) => {
+  if ("completed" in result && result.completed instanceof Promise) {
+    await result.completed.catch(() => {});
+  }
+  const text =
+    typeof result.finalOutput === "string"
+      ? result.finalOutput
+      : extractAllTextOutput(result.newItems);
+  return text ?? "";
+};

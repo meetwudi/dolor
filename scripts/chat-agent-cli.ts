@@ -48,8 +48,10 @@ const streamCliRun = async (
     stdout.write("\n\n");
   }
   if (!textBuffer.trim()) {
-    const fallback = getFinalResponseText(result);
-    stdout.write(`Dolor: ${fallback.trim()}\n\n`);
+    const fallback = (await getFinalResponseText(result)).trim();
+    if (fallback) {
+      stdout.write(`Dolor: ${fallback}\n\n`);
+    }
   }
 };
 

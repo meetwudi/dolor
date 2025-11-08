@@ -221,9 +221,11 @@ const streamTelegramRunResult = async (
     console.warn("Telegram streaming failed", error);
   }
 
-  const finalText =
-    assistantText.trim() || getFinalResponseText(result).trim() || "[No response]";
-  await sendTextResponse(apiBaseUrl, chatId, finalText, replyTo);
+  const fallback = (await getFinalResponseText(result)).trim();
+  const finalText = assistantText.trim() || fallback;
+  if (finalText) {
+    await sendTextResponse(apiBaseUrl, chatId, finalText, replyTo);
+  }
 };
 
 const parseCommand = (text: string) => {
