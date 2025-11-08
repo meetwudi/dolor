@@ -142,7 +142,8 @@ const EventAttachmentSchema = z
     mimetype: z.string().nullish(),
     url: z.string().nullish(),
   })
-  .passthrough();
+  .passthrough()
+  .nullish();
 
 const EventPushErrorSchema = z
   .object({
@@ -150,7 +151,8 @@ const EventPushErrorSchema = z
     message: z.string().nullish(),
     date: z.string().nullish(),
   })
-  .passthrough();
+  .passthrough()
+  .nullish();
 
 const EventWorkoutSchema = z
   .object({
@@ -243,6 +245,23 @@ const EventSchema = z
   .loose();
 
 const EventListSchema = z.array(EventSchema);
+
+const parseOrThrow = <T>(
+  schema: z.ZodType<T>,
+  raw: unknown,
+  label: string,
+): T => {
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    console.error(
+      `[Intervals.icu] Failed to parse ${label}:`,
+      parsed.error.flatten(),
+      raw,
+    );
+    throw new Error(`Failed to parse ${label} from Intervals.icu`);
+  }
+  return parsed.data;
+};
 
 const HrrSchema = z
   .object({
@@ -806,7 +825,11 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    const activities = ActivityListSchema.parse(raw);
+    const activities = parseOrThrow(
+      ActivityListSchema,
+      raw,
+      "activities list response",
+    );
     return activities.sort((a, b) => {
       const aDate = a.start_date_local ?? a.start_date ?? "";
       const bDate = b.start_date_local ?? b.start_date ?? "";
@@ -862,7 +885,7 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return EventListSchema.parse(raw);
+    return parseOrThrow(EventListSchema, raw, "events list response");
   }
 
   async getActivity(params: {
@@ -895,7 +918,7 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return ActivitySchema.parse(raw);
+    return parseOrThrow(ActivitySchema, raw, "activity response");
   }
 
   async updateWellnessRecord(
@@ -931,7 +954,7 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return WellnessRecordSchema.parse(raw);
+    return parseOrThrow(WellnessRecordSchema, raw, "wellness record response");
   }
 
   async getWellnessRecord(
@@ -958,7 +981,7 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return WellnessRecordSchema.parse(raw);
+    return parseOrThrow(WellnessRecordSchema, raw, "updated wellness record response");
   }
 
   async listWellnessRecords(
@@ -1011,7 +1034,11 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    const records = WellnessRecordListSchema.parse(raw);
+    const records = parseOrThrow(
+      WellnessRecordListSchema,
+      raw,
+      "wellness records response",
+    );
     return { format: "json", records, oldest, newest };
   }
 
@@ -1078,7 +1105,11 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    const parsed = CreateActivityMessageResponseSchema.parse(raw);
+    const parsed = parseOrThrow(
+      CreateActivityMessageResponseSchema,
+      raw,
+      "create activity message response",
+    );
     return {
       id: String(parsed.id),
       new_chat: parsed.new_chat ?? undefined,
@@ -1120,7 +1151,11 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return ActivityMessageListSchema.parse(raw);
+    return parseOrThrow(
+      ActivityMessageListSchema,
+      raw,
+      "activity messages response",
+    );
   }
 
   async createEvent(params: CreateEventParams): Promise<Event> {
@@ -1150,7 +1185,7 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return EventSchema.parse(raw);
+    return parseOrThrow(EventSchema, raw, "create event response");
   }
 
   async updateEvent(params: UpdateEventParams): Promise<Event> {
@@ -1178,7 +1213,7 @@ export class IntervalsClient {
     }
 
     const raw = await response.json();
-    return EventSchema.parse(raw);
+    return parseOrThrow(EventSchema, raw, "update event response");
   }
 }
 
