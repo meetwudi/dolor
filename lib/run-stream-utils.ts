@@ -10,8 +10,10 @@ import {
 
 const LARGE_INTERVAL_TOOLS = new Set([
   "list_intervals_activities",
+  "get_intervals_activity",
   "get_intervals_activity_intervals",
   "list_intervals_chat_messages",
+  "list_intervals_wellness_records",
 ]);
 
 type LogAudience = "cli" | "user";
@@ -53,6 +55,30 @@ const TOOL_LABELS: Record<
   add_intervals_activity_comment: {
     userCall: "Posting your note to the activity…",
     userDone: "Note posted.",
+  },
+  get_intervals_activity: {
+    cliCall: "[tool] Calling get_intervals_activity (large payload hidden)",
+    cliDone: "[tool] get_intervals_activity finished (output hidden)",
+    userCall: "Loading the full activity details…",
+    userDone: "Activity details ready.",
+  },
+  get_intervals_wellness_record: {
+    cliCall: "[tool] Calling get_intervals_wellness_record",
+    cliDone: "[tool] get_intervals_wellness_record completed",
+    userCall: "Reviewing the wellness record for that day…",
+    userDone: "Wellness record ready.",
+  },
+  list_intervals_wellness_records: {
+    cliCall: "[tool] Calling list_intervals_wellness_records (large payload hidden)",
+    cliDone: "[tool] list_intervals_wellness_records finished (output hidden)",
+    userCall: "Fetching those wellness records…",
+    userDone: "Wellness history ready.",
+  },
+  get_local_weather_forecast: {
+    cliCall: "[tool] Calling get_local_weather_forecast",
+    cliDone: "[tool] get_local_weather_forecast completed",
+    userCall: "Checking the local weather forecast…",
+    userDone: "Forecast ready.",
   },
 };
 

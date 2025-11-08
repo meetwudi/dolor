@@ -13,6 +13,10 @@ Default to using Bun instead of Node.js.
 - Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
 - Bun automatically loads .env, so don't use dotenv.
 
+## Tooling
+
+- When you add or rename an agent tool, also update `lib/run-stream-utils.ts` so TOOL_LABELS and related logging stay accurate for the CLI and user transcripts.
+
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.

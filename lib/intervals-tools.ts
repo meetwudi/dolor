@@ -103,6 +103,28 @@ export const listIntervalsActivitiesTool = tool({
   },
 });
 
+export const getIntervalsActivityTool = tool({
+  name: "get_intervals_activity",
+  description:
+    "Fetch a single Intervals.icu activity with all metadata (power/hr/pace loads, device info, notes, etc.). Set includeIntervals=true when you want the interval arrays embedded in the same response; otherwise keep it false and call get_intervals_activity_intervals for a slimmer interval-only payload. Prefer this when you need the entire activity context in one call.",
+  parameters: z.object({
+    activityId: z
+      .union([z.string(), z.number()])
+      .describe(
+        "Intervals.icu activity identifier (found via list_intervals_activities or athlete share).",
+      ),
+    includeIntervals: z
+      .boolean()
+      .describe(
+        "Set to true to embed interval data directly in the activity response; false keeps the payload lighter.",
+      ),
+  }),
+  execute: async ({ activityId, includeIntervals }) => {
+    const client = new IntervalsClient();
+    return client.getActivity({ activityId, includeIntervals });
+  },
+});
+
 export const getIntervalsWellnessRecordTool = tool({
   name: "get_intervals_wellness_record",
   description:
@@ -223,7 +245,7 @@ export const listIntervalsWellnessRecordsTool = tool({
 export const getIntervalsActivityIntervalsTool = tool({
   name: "get_intervals_activity_intervals",
   description:
-    "Fetch the full interval breakdown (icu_intervals and icu_groups) for a specific Intervals.icu activity. Use this when you need detailed workout interval performance metrics like power, cadence, heart rate, or strain for targeted coaching.",
+    "Fetch only the interval breakdown (icu_intervals and icu_groups) for a specific Intervals.icu activity. Use this when you want the concise interval view (power, cadence, HR, strain, etc.) without the rest of the activity metadata. For the complete activity plus optional intervals in a single call, use get_intervals_activity instead.",
   parameters: z.object({
     activityId: z
       .union([z.string(), z.number()])

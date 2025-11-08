@@ -659,6 +659,39 @@ export class IntervalsClient {
     });
   }
 
+  async getActivity(params: {
+    activityId: string | number;
+    includeIntervals: boolean;
+  }): Promise<Activity> {
+    const { activityId, includeIntervals } = params;
+
+    if (!activityId && activityId !== 0) {
+      throw new Error("activityId is required");
+    }
+
+    const id = String(activityId);
+    const qs = new URLSearchParams({
+      intervals: includeIntervals ? "true" : "false",
+    });
+    const url = `${this.baseUrl}/activity/${id}?${qs.toString()}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return ActivitySchema.parse(raw);
+  }
+
   async updateWellnessRecord(
     params: UpdateWellnessRecordParams,
   ): Promise<WellnessRecord> {
