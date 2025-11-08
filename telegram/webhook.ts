@@ -54,10 +54,13 @@ type SessionState = {
   session: Session;
   athleteId?: string;
   lastInstructionKey?: string;
+  expiresAt?: number;
 };
 
 const TELEGRAM_CHAR_LIMIT = 4096;
 const UPDATE_DEDUPE_TTL_SECONDS = 600;
+const SESSION_TTL_SECONDS = 600;
+const LOCAL_SESSION_TTL_MS = 10 * 60 * 1000;
 const redis = Redis.fromEnv();
 
 const sessionStore = new Map<string, SessionState>();
@@ -83,27 +86,33 @@ const getInstructionKey = (athleteId?: string) =>
   athleteId ? `athlete:${athleteId}` : "athlete:none";
 
 const createSession = (sessionId: string): Session =>
-  new UpstashSession({ sessionId });
+  new UpstashSession({ sessionId, ttlSeconds: SESSION_TTL_SECONDS });
+
+const createSessionState = (key: string): SessionState => ({
+  session: createSession(key),
+  expiresAt: Date.now() + LOCAL_SESSION_TTL_MS,
+});
 
 const ensureSessionState = (key: string) => {
   let state = sessionStore.get(key);
+  const now = Date.now();
+
+  if (state?.expiresAt && state.expiresAt <= now) {
+    sessionStore.delete(key);
+    state = undefined;
+  }
+
   if (!state) {
-    state = { session: createSession(key) };
+    state = createSessionState(key);
     sessionStore.set(key, state);
+  } else {
+    state.expiresAt = now + LOCAL_SESSION_TTL_MS;
   }
   return state;
 };
 
-const resetSessionState = async (key: string) => {
-  const previous = sessionStore.get(key);
-  if (previous) {
-    try {
-      await previous.session.clearSession();
-    } catch (error) {
-      console.warn("Failed to clear previous session", error);
-    }
-  }
-  const next: SessionState = { session: createSession(key) };
+const resetSessionState = (key: string) => {
+  const next = createSessionState(key);
   sessionStore.set(key, next);
   return next;
 };

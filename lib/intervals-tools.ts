@@ -5,6 +5,7 @@ import {
   type Activity,
   type ActivityIntervals,
   type ActivityMessage,
+  type ListWellnessRecordsResult,
   type WellnessRecord,
 } from "./intervals";
 
@@ -102,6 +103,27 @@ export const listIntervalsActivitiesTool = tool({
   },
 });
 
+export const getIntervalsWellnessRecordTool = tool({
+  name: "get_intervals_wellness_record",
+  description:
+    "Fetch a single Intervals.icu wellness record for an athlete on a specific local date (YYYY-MM-DD). Records include CTL/ATL/rampRate loads, weight, restingHR, HRV + SDNN, sleep duration/score/quality, avg sleep HR, soreness/fatigue/stress/mood/motivation/injury, SpO2, blood pressure, hydration + volume, readiness/Baevsky SI, calories, steps, respiration, menstrual phases, body fat/abdomen/VO2max, blood glucose, lactate, comments, and sport-specific FTP/CP metrics.",
+  parameters: z.object({
+    athleteId: z
+      .string()
+      .min(1, "athleteId is required")
+      .describe("Intervals.icu athlete identifier (usually numeric)."),
+    date: z
+      .string()
+      .min(1, "date is required")
+      .describe("Local date in YYYY-MM-DD format."),
+  }),
+  execute: async ({ athleteId, date }) => {
+    const client = new IntervalsClient();
+    const record = await client.getWellnessRecord({ athleteId, date });
+    return record;
+  },
+});
+
 export const updateIntervalsWellnessCommentTool = tool({
   name: "update_intervals_wellness_comment",
   description:
@@ -147,6 +169,54 @@ export const updateIntervalsWellnessCommentTool = tool({
     };
 
     return summary;
+  },
+});
+
+export const listIntervalsWellnessRecordsTool = tool({
+  name: "list_intervals_wellness_records",
+  description:
+    "List Intervals.icu wellness records (same CTL/ATL/rampRate, weight, restingHR/HRV, sleep, soreness/fatigue/stress/mood/motivation/injury, SpO2, BP, hydration, readiness, calories, steps, respiration, menstrual phases, composition, blood glucose, lactate, comments, sport FTP metrics, etc.) for an athlete between two local dates. Provide '.csv' in ext for CSV output or leave blank for JSON—the response tells you which via its `format` field. cols/fields are comma-separated lists; use empty strings when no filtering is needed.",
+  parameters: z.object({
+    athleteId: z
+      .string()
+      .min(1, "athleteId is required")
+      .describe("Intervals.icu athlete identifier (usually numeric)."),
+    ext: z
+      .string()
+      .describe(
+        "Extension appended to /wellness ('' for JSON, '.csv' for CSV export).",
+      ),
+    oldest: z
+      .string()
+      .min(1, "oldest date is required")
+      .describe("Start date (YYYY-MM-DD)."),
+    newest: z
+      .string()
+      .min(1, "newest date is required")
+      .describe("End date (YYYY-MM-DD), inclusive."),
+    cols: z
+      .string()
+      .describe(
+        "Comma separated column names for CSV export. Use an empty string for defaults.",
+      ),
+    fields: z
+      .string()
+      .describe(
+        "Comma separated JSON fields to include. Use an empty string for defaults.",
+      ),
+  }),
+  execute: async ({ athleteId, ext, oldest, newest, cols, fields }) => {
+    const client = new IntervalsClient();
+    const result: ListWellnessRecordsResult =
+      await client.listWellnessRecords({
+        athleteId,
+        ext,
+        oldest,
+        newest,
+        cols,
+        fields,
+      });
+    return result;
   },
 });
 

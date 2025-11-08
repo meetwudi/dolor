@@ -19,6 +19,7 @@ import {
 } from "../lib/run-stream-utils";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "q", ":q"]);
+const SESSION_TTL_SECONDS = 600;
 
 const streamCliRun = async (
   result: StreamedRunResult<any, any>,
@@ -68,7 +69,7 @@ async function main() {
   const athleteId = parsed.values["athlete-id"];
 
   const rl = readline.createInterface({ input: stdin, output: stdout });
-  const session = new UpstashSession();
+  const session = new UpstashSession({ ttlSeconds: SESSION_TTL_SECONDS });
 
   console.log(
     athleteId

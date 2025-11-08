@@ -565,6 +565,8 @@ const WellnessRecordSchema = z
   })
   .loose();
 
+const WellnessRecordListSchema = z.array(WellnessRecordSchema);
+
 export interface ListActivitiesParams {
   athleteId: string;
   oldest: string;
@@ -574,11 +576,34 @@ export interface ListActivitiesParams {
 export type WellnessRecord = z.infer<typeof WellnessRecordSchema>;
 export type WellnessRecordUpdate = Partial<WellnessRecord> & { id?: string };
 
+export interface GetWellnessRecordParams {
+  athleteId: string;
+  date: string;
+}
+
 export interface UpdateWellnessRecordParams {
   athleteId: string;
   date: string;
   data: WellnessRecordUpdate;
 }
+
+export interface ListWellnessRecordsParams {
+  athleteId: string;
+  ext: string;
+  oldest: string;
+  newest: string;
+  cols?: string;
+  fields?: string;
+}
+
+export type ListWellnessRecordsResult =
+  | {
+      format: "json";
+      records: WellnessRecord[];
+      oldest: string;
+      newest: string;
+    }
+  | { format: "csv"; csv: string; oldest: string; newest: string };
 
 const DEFAULT_BASE_URL = "https://intervals.icu/api/v1";
 
@@ -668,6 +693,87 @@ export class IntervalsClient {
 
     const raw = await response.json();
     return WellnessRecordSchema.parse(raw);
+  }
+
+  async getWellnessRecord(
+    params: GetWellnessRecordParams,
+  ): Promise<WellnessRecord> {
+    const { athleteId, date } = params;
+
+    if (!athleteId) throw new Error("athleteId is required");
+    if (!date) throw new Error("date is required");
+
+    const url = `${this.baseUrl}/athlete/${athleteId}/wellness/${date}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return WellnessRecordSchema.parse(raw);
+  }
+
+  async listWellnessRecords(
+    params: ListWellnessRecordsParams,
+  ): Promise<ListWellnessRecordsResult> {
+    const { athleteId, ext, oldest, newest, cols, fields } = params;
+
+    if (!athleteId) throw new Error("athleteId is required");
+    if (!oldest) throw new Error("oldest date is required");
+    if (!newest) throw new Error("newest date is required");
+    if (ext === undefined || ext === null) {
+      throw new Error("ext is required (use '' for JSON or '.csv' for CSV)");
+    }
+
+    const trimmedExt = ext.trim();
+    if (trimmedExt && !trimmedExt.startsWith(".")) {
+      throw new Error("ext must be empty or start with '.' (e.g., '.csv')");
+    }
+
+    const qs = new URLSearchParams({ oldest, newest });
+    if (cols?.trim()) {
+      qs.set("cols", cols.trim());
+    }
+    if (fields?.trim()) {
+      qs.set("fields", fields.trim());
+    }
+
+    const url = `${this.baseUrl}/athlete/${athleteId}/wellness${trimmedExt}${
+      qs.toString() ? `?${qs.toString()}` : ""
+    }`;
+
+    const expectCsv = trimmedExt === ".csv";
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: expectCsv ? "text/csv" : "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    if (expectCsv) {
+      const csv = await response.text();
+      return { format: "csv", csv, oldest, newest };
+    }
+
+    const raw = await response.json();
+    const records = WellnessRecordListSchema.parse(raw);
+    return { format: "json", records, oldest, newest };
   }
 
   async getActivityIntervals(activityId: string | number): Promise<ActivityIntervals> {
