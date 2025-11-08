@@ -6,6 +6,7 @@ import {
   type ActivityIntervals,
   type ActivityMessage,
   type ListWellnessRecordsResult,
+  type Event,
   type WellnessRecord,
 } from "./intervals";
 
@@ -57,6 +58,20 @@ const summarizeChatMessage = (message: ActivityMessage) => ({
   activity_id: message.activity_id ?? null,
 });
 
+const summarizeEvent = (event: Event) => ({
+  id: event.id ?? null,
+  name: event.name ?? null,
+  category: event.category ?? null,
+  target: event.target ?? null,
+  start_date_local: event.start_date_local ?? null,
+  end_date_local: event.end_date_local ?? null,
+  calendar_id: event.calendar_id ?? null,
+  description: event.description ?? null,
+  strain_score: event.strain_score ?? null,
+  workout_id: event.workout?.id ?? null,
+  updated: event.updated ?? null,
+});
+
 export const listIntervalsActivitiesTool = tool({
   name: "list_intervals_activities",
   description:
@@ -100,6 +115,196 @@ export const listIntervalsActivitiesTool = tool({
       count: activities.length,
       activities: activities.map(summarizeActivity),
     };
+  },
+});
+
+export const listIntervalsEventsTool = tool({
+  name: "list_intervals_events",
+  description:
+    "List Intervals.icu calendar events (planned workouts, races, notes, etc.). Defaults to the last 7 days ending today in America/Los_Angeles when no dates are provided—do NOT stop to confirm that range, just mention it. The `description` field contains the workout text for structured workouts, so read/write it when you need the athlete-facing prescription.",
+  parameters: z.object({
+    athleteId: z
+      .string()
+      .min(1, "athleteId is required")
+      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
+    oldest: z
+      .string()
+      .describe(
+        'Start date (YYYY-MM-DD). Use an empty string to default to 6 days prior in America/Los_Angeles.',
+      ),
+    newest: z
+      .string()
+      .describe(
+        "End date (YYYY-MM-DD). Use an empty string to default to today in America/Los_Angeles.",
+      ),
+    categories: z
+      .string()
+      .describe(
+        "Comma-separated categories to filter (WORKOUT,NOTE,etc.). Use an empty string for all.",
+      ),
+    limit: z
+      .string()
+      .describe(
+        "Max number of events to return (integer). Use an empty string for the API default.",
+      ),
+    calendarId: z
+      .string()
+      .describe(
+        "Numeric calendar_id to filter. Use an empty string to include all calendars.",
+      ),
+    resolve: z
+      .string()
+      .describe(
+        "Set to 'true' to resolve targets into watts/bpm/pace; otherwise leave empty for default.",
+      ),
+    locale: z
+      .string()
+      .describe(
+        "Locale code (en, es, de, etc.) for multi-lingual workouts, or empty to use the athlete default.",
+      ),
+  }),
+  execute: async ({
+    athleteId,
+    oldest,
+    newest,
+    categories,
+    limit,
+    calendarId,
+    resolve,
+    locale,
+  }) => {
+    const defaultRange = getDefaultActivityDateRange();
+    const resolvedOldest = oldest.trim()
+      ? oldest
+      : defaultRange.oldest;
+    const resolvedNewest = newest.trim()
+      ? newest
+      : defaultRange.newest;
+
+    const resolvedCategories = categories.trim() || undefined;
+    const parsedLimit = limit.trim() ? Number.parseInt(limit.trim(), 10) : undefined;
+    const resolvedLimit =
+      parsedLimit !== undefined && Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const parsedCalendarId = calendarId.trim()
+      ? Number.parseInt(calendarId.trim(), 10)
+      : undefined;
+    const resolvedCalendarId =
+      parsedCalendarId !== undefined && Number.isFinite(parsedCalendarId)
+        ? parsedCalendarId
+        : undefined;
+    const resolvedResolve =
+      resolve.trim() === ""
+        ? undefined
+        : resolve.trim().toLowerCase() === "true";
+    const resolvedLocale = locale.trim() || undefined;
+
+    const client = new IntervalsClient();
+    const events = await client.listEvents({
+      athleteId,
+      oldest: resolvedOldest,
+      newest: resolvedNewest,
+      categories: resolvedCategories,
+      limit: Number.isNaN(resolvedLimit ?? NaN) ? undefined : resolvedLimit,
+      calendarId: Number.isNaN(resolvedCalendarId ?? NaN)
+        ? undefined
+        : resolvedCalendarId,
+      resolve: resolvedResolve,
+      locale: resolvedLocale,
+    });
+
+    return {
+      oldest: resolvedOldest,
+      newest: resolvedNewest,
+      count: events.length,
+      events: events.map(summarizeEvent),
+    };
+  },
+});
+
+export const updateIntervalsEventTool = tool({
+  name: "update_intervals_event",
+  description:
+    "Update an Intervals.icu calendar event (planned workout, race, or note). Patching the `description` field is the way to store the workout text you generated. Supply only the fields you intend to modify via payload_json (e.g., {\"description\": \"...\"}).",
+  parameters: z.object({
+    athleteId: z
+      .string()
+      .min(1, "athleteId is required")
+      .describe("Intervals.icu athlete identifier."),
+    eventId: z
+      .union([z.string(), z.number()])
+      .describe("Event identifier from list_intervals_events."),
+    payload_json: z
+      .string()
+      .min(2, "payload_json must not be empty")
+      .describe(
+        "Stringified JSON body to send to Intervals.icu. Include only the fields you want to update (e.g., description, start_date_local, target).",
+      ),
+  }),
+  execute: async ({ athleteId, eventId, payload_json }) => {
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(payload_json);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Invalid JSON payload.";
+      throw new Error(`Failed to parse payload_json: ${message}`);
+    }
+
+    const client = new IntervalsClient();
+    const event = await client.updateEvent({
+      athleteId,
+      eventId,
+      data,
+    });
+
+    return summarizeEvent(event);
+  },
+});
+
+export const createIntervalsEventTool = tool({
+  name: "create_intervals_event",
+  description:
+    "Create an Intervals.icu calendar event (planned workout, race, note, etc.). Populate the `description` field with workout text when you generate a structured workout. Set upsertOnUid to true when you want to update an existing event that shares the same UID instead of creating a duplicate.",
+  parameters: z.object({
+    athleteId: z
+      .string()
+      .min(1, "athleteId is required")
+      .describe("Intervals.icu athlete identifier."),
+    payload_json: z
+      .string()
+      .min(2, "payload_json must not be empty")
+      .describe(
+        "Stringified JSON body for POST /athlete/{id}/events (include start_date_local, category, description, etc.).",
+      ),
+    upsertOnUid: z
+      .string()
+      .describe(
+        "Set to 'true' to update an existing event with the same uid; leave empty to always create a new event.",
+      ),
+  }),
+  execute: async ({ athleteId, payload_json, upsertOnUid }) => {
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(payload_json);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Invalid JSON payload.";
+      throw new Error(`Failed to parse payload_json: ${message}`);
+    }
+
+    const resolvedUpsert =
+      upsertOnUid.trim() === ""
+        ? undefined
+        : upsertOnUid.trim().toLowerCase() === "true";
+
+    const client = new IntervalsClient();
+    const event = await client.createEvent({
+      athleteId,
+      data,
+      upsertOnUid: resolvedUpsert,
+    });
+
+    return summarizeEvent(event);
   },
 });
 

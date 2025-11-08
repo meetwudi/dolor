@@ -102,6 +102,24 @@ const MenstrualPhaseEnum = z.enum([
   "LUTEAL",
   "NONE",
 ]);
+const EventCategoryEnum = z.enum([
+  "WORKOUT",
+  "RACE_A",
+  "RACE_B",
+  "RACE_C",
+  "NOTE",
+  "PLAN",
+  "HOLIDAY",
+  "SICK",
+  "INJURED",
+  "SET_EFTP",
+  "FITNESS_DAYS",
+  "SEASON_START",
+  "TARGET",
+  "SET_FITNESS",
+]);
+const EventTargetEnum = z.enum(["AUTO", "POWER", "HR", "PACE"]);
+const EventSubTypeEnum = z.enum(["NONE", "COMMUTE", "WARMUP", "COOLDOWN", "RACE"]);
 
 const GearSchema = z
   .object({
@@ -116,6 +134,115 @@ const SkylineBytesSchema = z.union([
   z.array(z.number()),
   z.string(),
 ]);
+
+const EventAttachmentSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]).nullish(),
+    filename: z.string().nullish(),
+    mimetype: z.string().nullish(),
+    url: z.string().nullish(),
+  })
+  .passthrough();
+
+const EventPushErrorSchema = z
+  .object({
+    service: z.string().nullish(),
+    message: z.string().nullish(),
+    date: z.string().nullish(),
+  })
+  .passthrough();
+
+const EventWorkoutSchema = z
+  .object({
+    athlete_id: z.string().nullish(),
+    id: z.union([z.number(), z.string()]).nullish(),
+    name: z.string().nullish(),
+    description: z.string().nullish(),
+    type: z.string().nullish(),
+    indoor: z.boolean().nullish(),
+    moving_time: z.number().nullish(),
+    joules: z.number().nullish(),
+    joules_above_ftp: z.number().nullish(),
+    updated: z.string().nullish(),
+    target: EventTargetEnum.nullish(),
+    targetS: z.array(EventTargetEnum).nullish(),
+    carbs_per_hour: z.number().nullish(),
+    tags: z.array(z.string()).nullish(),
+    workout_doc: z.record(z.unknown()).nullish(),
+    time: z.string().nullish(),
+    sub_type: EventSubTypeEnum.nullish(),
+    distance: z.number().nullish(),
+    icu_intensity: z.number().nullish(),
+  })
+  .loose()
+  .nullish();
+
+const EventSchema = z
+  .object({
+    id: z.union([z.number(), z.string()]).nullish(),
+    start_date_local: z.string().nullish(),
+    end_date_local: z.string().nullish(),
+    name: z.string().nullish(),
+    description: z.string().nullish(),
+    icu_training_load: z.number().nullish(),
+    icu_atl: z.number().nullish(),
+    icu_ctl: z.number().nullish(),
+    type: z.string().nullish(),
+    carbs_used: z.number().nullish(),
+    ss_p_max: z.number().nullish(),
+    ss_w_prime: z.number().nullish(),
+    ss_cp: z.number().nullish(),
+    calendar_id: z.number().int().nullish(),
+    uid: z.string().nullish(),
+    athlete_id: z.string().nullish(),
+    category: EventCategoryEnum.nullish(),
+    indoor: z.boolean().nullish(),
+    color: z.string().nullish(),
+    moving_time: z.number().nullish(),
+    icu_ftp: z.number().nullish(),
+    w_prime: z.number().nullish(),
+    p_max: z.number().nullish(),
+    atl_days: z.number().nullish(),
+    ctl_days: z.number().nullish(),
+    updated: z.string().nullish(),
+    not_on_fitness_chart: z.boolean().nullish(),
+    show_as_note: z.boolean().nullish(),
+    show_on_ctl_line: z.boolean().nullish(),
+    for_week: z.boolean().nullish(),
+    target: EventTargetEnum.nullish(),
+    joules: z.number().nullish(),
+    joules_above_ftp: z.number().nullish(),
+    workout_doc: z.unknown().nullish(),
+    push_errors: z.array(EventPushErrorSchema).nullish(),
+    athlete_cannot_edit: z.boolean().nullish(),
+    hide_from_athlete: z.boolean().nullish(),
+    structure_read_only: z.boolean().nullish(),
+    created_by_id: z.string().nullish(),
+    shared_event_id: z.number().nullish(),
+    entered: z.boolean().nullish(),
+    carbs_per_hour: z.number().nullish(),
+    sub_type: EventSubTypeEnum.nullish(),
+    distance: z.number().nullish(),
+    tags: z.array(z.string()).nullish(),
+    attachments: z.array(EventAttachmentSchema).nullish(),
+    oauth_client_id: z.number().nullish(),
+    external_id: z.string().nullish(),
+    load_target: z.number().nullish(),
+    time_target: z.number().nullish(),
+    distance_target: z.number().nullish(),
+    plan_athlete_id: z.string().nullish(),
+    plan_folder_id: z.number().nullish(),
+    plan_workout_id: z.number().nullish(),
+    plan_applied: z.string().nullish(),
+    icu_intensity: z.number().nullish(),
+    strain_score: z.number().nullish(),
+    workout: EventWorkoutSchema,
+    targetS: z.array(EventTargetEnum).nullish(),
+    locale: z.string().nullish(),
+  })
+  .loose();
+
+const EventListSchema = z.array(EventSchema);
 
 const HrrSchema = z
   .object({
@@ -575,6 +702,7 @@ export interface ListActivitiesParams {
 }
 export type WellnessRecord = z.infer<typeof WellnessRecordSchema>;
 export type WellnessRecordUpdate = Partial<WellnessRecord> & { id?: string };
+export type Event = z.infer<typeof EventSchema>;
 
 export interface GetWellnessRecordParams {
   athleteId: string;
@@ -594,6 +722,33 @@ export interface ListWellnessRecordsParams {
   newest: string;
   cols?: string;
   fields?: string;
+}
+
+export interface ListEventsParams {
+  athleteId: string;
+  oldest: string;
+  newest: string;
+  categories?: string;
+  limit?: number;
+  calendarId?: number;
+  ext?: string;
+  powerRange?: number;
+  hrRange?: number;
+  paceRange?: number;
+  locale?: string;
+  resolve?: boolean;
+}
+
+export interface UpdateEventParams {
+  athleteId: string;
+  eventId: string | number;
+  data: Record<string, unknown>;
+}
+
+export interface CreateEventParams {
+  athleteId: string;
+  upsertOnUid?: boolean;
+  data: Record<string, unknown>;
 }
 
 export type ListWellnessRecordsResult =
@@ -657,6 +812,57 @@ export class IntervalsClient {
       const bDate = b.start_date_local ?? b.start_date ?? "";
       return aDate < bDate ? 1 : -1;
     });
+  }
+
+  async listEvents(params: ListEventsParams): Promise<Event[]> {
+    const {
+      athleteId,
+      oldest,
+      newest,
+      categories,
+      limit,
+      calendarId,
+      ext,
+      powerRange,
+      hrRange,
+      paceRange,
+      locale,
+      resolve,
+    } = params;
+
+    if (!athleteId) throw new Error("athleteId is required");
+    if (!oldest) throw new Error("oldest date is required");
+    if (!newest) throw new Error("newest date is required");
+
+    const qs = new URLSearchParams({ oldest, newest });
+    if (categories) qs.set("category", categories);
+    if (typeof limit === "number") qs.set("limit", limit.toString());
+    if (typeof calendarId === "number") qs.set("calendar_id", calendarId.toString());
+    if (ext) qs.set("ext", ext);
+    if (typeof powerRange === "number") qs.set("powerRange", powerRange.toString());
+    if (typeof hrRange === "number") qs.set("hrRange", hrRange.toString());
+    if (typeof paceRange === "number") qs.set("paceRange", paceRange.toString());
+    if (locale) qs.set("locale", locale);
+    if (typeof resolve === "boolean") qs.set("resolve", resolve ? "true" : "false");
+
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const url = `${this.baseUrl}/athlete/${athleteId}/events${suffix}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return EventListSchema.parse(raw);
   }
 
   async getActivity(params: {
@@ -915,6 +1121,64 @@ export class IntervalsClient {
 
     const raw = await response.json();
     return ActivityMessageListSchema.parse(raw);
+  }
+
+  async createEvent(params: CreateEventParams): Promise<Event> {
+    const { athleteId, data, upsertOnUid } = params;
+    if (!athleteId) throw new Error("athleteId is required");
+    const qs = new URLSearchParams();
+    if (typeof upsertOnUid === "boolean") {
+      qs.set("upsertOnUid", upsertOnUid ? "true" : "false");
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const url = `${this.baseUrl}/athlete/${athleteId}/events${suffix}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return EventSchema.parse(raw);
+  }
+
+  async updateEvent(params: UpdateEventParams): Promise<Event> {
+    const { athleteId, eventId, data } = params;
+    if (!athleteId) throw new Error("athleteId is required");
+    if (eventId === undefined || eventId === null) {
+      throw new Error("eventId is required");
+    }
+    const url = `${this.baseUrl}/athlete/${athleteId}/events/${String(eventId)}`;
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Intervals.icu request failed (${response.status} ${response.statusText}): ${text}`,
+      );
+    }
+
+    const raw = await response.json();
+    return EventSchema.parse(raw);
   }
 }
 

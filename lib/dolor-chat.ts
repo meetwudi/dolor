@@ -12,8 +12,11 @@ import { withSessionContext } from "./session-context";
 
 const LARGE_INTERVAL_TOOLS = new Set([
   "list_intervals_activities",
+  "list_intervals_events",
   "get_intervals_activity_intervals",
   "list_intervals_chat_messages",
+  "update_intervals_event",
+  "create_intervals_event",
 ]);
 
 const valueContainsLargeToolName = (

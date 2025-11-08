@@ -10,10 +10,13 @@ import {
 
 const LARGE_INTERVAL_TOOLS = new Set([
   "list_intervals_activities",
+  "list_intervals_events",
   "get_intervals_activity",
   "get_intervals_activity_intervals",
   "list_intervals_chat_messages",
   "list_intervals_wellness_records",
+  "update_intervals_event",
+  "create_intervals_event",
 ]);
 
 type LogAudience = "cli" | "user";
@@ -37,6 +40,12 @@ const TOOL_LABELS: Record<
     cliDone: "[tool] list_intervals_activities finished (output hidden)",
     userCall: "Fetching your recent activities…",
     userDone: "Activities ready.",
+  },
+  list_intervals_events: {
+    cliCall: "[tool] Calling list_intervals_events (large payload hidden)",
+    cliDone: "[tool] list_intervals_events finished (output hidden)",
+    userCall: "Pulling your planned workouts and notes…",
+    userDone: "Calendar events ready.",
   },
   get_intervals_activity_intervals: {
     cliCall: "[tool] Calling get_intervals_activity_intervals (large payload hidden)",
@@ -109,6 +118,18 @@ const TOOL_LABELS: Record<
     cliDone: "[tool] validate_intervals_workout completed",
     userCall: "Double-checking the workout format…",
     userDone: "Workout format verified.",
+  },
+  update_intervals_event: {
+    cliCall: "[tool] Calling update_intervals_event (large payload hidden)",
+    cliDone: "[tool] update_intervals_event finished (output hidden)",
+    userCall: "Updating that calendar event…",
+    userDone: "Event updated.",
+  },
+  create_intervals_event: {
+    cliCall: "[tool] Calling create_intervals_event (large payload hidden)",
+    cliDone: "[tool] create_intervals_event finished (output hidden)",
+    userCall: "Adding that to your calendar…",
+    userDone: "Event created.",
   },
 };
 
