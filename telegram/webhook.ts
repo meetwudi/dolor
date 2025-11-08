@@ -186,132 +186,18 @@ const sendTextResponse = async (
   }
 };
 
-const editTelegramMessage = async (
-  apiBaseUrl: string,
-  chatId: number,
-  messageId: number,
-  text: string,
-) => {
-  const response = await fetch(`${apiBaseUrl}/editMessageText`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      text,
-      disable_web_page_preview: true,
-    }),
-  });
-
-  let data: any = null;
-  try {
-    data = await response.json();
-  } catch (error) {
-    console.error("Telegram editMessageText parse failure", error);
-  }
-
-  if (!response.ok || !data?.ok) {
-    const body = data ? JSON.stringify(data) : await response.text();
-    console.error("Telegram editMessageText failed", response.status, body);
-    return false;
-  }
-
-  return true;
-};
-
-const deleteTelegramMessage = async (
-  apiBaseUrl: string,
-  chatId: number,
-  messageId: number,
-) => {
-  const response = await fetch(`${apiBaseUrl}/deleteMessage`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("Telegram deleteMessage failed", response.status, body);
-  }
-};
-
-const STREAM_UPDATE_INTERVAL_MS = 700;
-
 const streamTelegramRunResult = async (
   apiBaseUrl: string,
   chatId: number,
   replyTo: number | undefined,
   result: StreamedRunResult<any, any>,
 ) => {
-  let previewMessageId: number | undefined;
-  let lastUpdate = 0;
   let assistantText = "";
-  const logLines: string[] = [];
-
-  const buildPreviewText = () => {
-    const combined = [
-      logLines.length ? logLines.join("\n") : "",
-      assistantText || "_",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    if (combined.length <= TELEGRAM_CHAR_LIMIT) return combined;
-    return combined.slice(-TELEGRAM_CHAR_LIMIT);
-  };
-
-  const flushPreview = async (force = false) => {
-    const text = buildPreviewText();
-    if (!text.trim()) return;
-    const now = Date.now();
-    if (!force && now - lastUpdate < STREAM_UPDATE_INTERVAL_MS) return;
-
-    if (!previewMessageId) {
-      const sent = await sendTelegramMessage(apiBaseUrl, {
-        chat_id: chatId,
-        text,
-        reply_to_message_id: replyTo,
-        disable_notification: false,
-        disable_web_page_preview: true,
-      });
-      previewMessageId = sent?.message_id;
-    } else {
-      const ok = await editTelegramMessage(
-        apiBaseUrl,
-        chatId,
-        previewMessageId,
-        text,
-      );
-      if (!ok) {
-        previewMessageId = undefined;
-      }
-    }
-    lastUpdate = now;
-  };
-
   try {
     for await (const event of result as AsyncIterable<RunStreamEvent>) {
-      const logLine = getLogLineFromEvent(event, "user");
-      let changed = false;
-      if (logLine) {
-        logLines.push(logLine);
-        if (logLines.length > 15) logLines.shift();
-        changed = true;
-      }
       const delta = getTextDeltaFromEvent(event);
       if (delta) {
         assistantText += delta;
-        changed = true;
-      }
-      if (changed) {
-        await flushPreview();
       }
     }
     await result.completed;
@@ -322,9 +208,6 @@ const streamTelegramRunResult = async (
   const finalText =
     assistantText.trim() || getFinalResponseText(result).trim() || "[No response]";
   await sendTextResponse(apiBaseUrl, chatId, finalText, replyTo);
-  if (previewMessageId) {
-    await deleteTelegramMessage(apiBaseUrl, chatId, previewMessageId);
-  }
 };
 
 const parseCommand = (text: string) => {
