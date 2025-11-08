@@ -374,7 +374,16 @@ const parseStepLine = (line: string, lineNumber: number): ParsedWorkoutStep & { 
     };
   }
 
-  const [content, notePart] = withoutPrefix.split("#", 2);
+  const hashIndex = withoutPrefix.indexOf("#");
+  const content =
+    hashIndex >= 0 ? withoutPrefix.slice(0, hashIndex).trim() : withoutPrefix;
+  const notePart =
+    hashIndex >= 0 ? withoutPrefix.slice(hashIndex + 1).trim() : undefined;
+  if (hashIndex >= 0) {
+    errors.push(
+      `Line ${lineNumber}: Replace '#${notePart ? ` ${notePart}` : ""}' comments with inline text before the duration (e.g., '- Seated smooth 3m ...').`,
+    );
+  }
   const decimalMatches = findMatches(DECIMAL_DURATION_DISTANCE_PATTERN, withoutPrefix);
   if (decimalMatches.length) {
     errors.push(
@@ -407,7 +416,7 @@ const parseStepLine = (line: string, lineNumber: number): ParsedWorkoutStep & { 
     cadence: findMatches(CADENCE_PATTERN, content),
     ramps: findMatches(RAMP_PATTERN, content),
     paces: findMatches(PACE_PATTERN, content),
-    notes: notePart?.trim() || undefined,
+    notes: notePart || undefined,
     errors,
   };
 };

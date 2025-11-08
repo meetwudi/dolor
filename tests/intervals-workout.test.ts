@@ -238,4 +238,18 @@ describe("validateIntervalsWorkoutText", () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((msg) => msg.includes("whole-number"))).toBe(true);
   });
+
+  test("rejects hash comments", () => {
+    const result = validateIntervalsWorkoutText(
+      [
+        "Main Set",
+        "- 3m Z5 (289-330w) 95-100rpm # seated smooth",
+      ].join("\n"),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((msg) => msg.includes("Replace '#"))).toBe(
+      true,
+    );
+  });
 });
