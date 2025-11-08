@@ -225,4 +225,17 @@ describe("validateIntervalsWorkoutText", () => {
     expect(firstTempoStep.ramps).toContain("ramp Z1-Z2");
     expect(secondTempoStep.ramps).toContain("ramp Z2");
   });
+
+  test("rejects decimal durations and distances", () => {
+    const result = validateIntervalsWorkoutText(
+      [
+        "Bad Plan",
+        "- 5.5h endurance Z2",
+        "- 1.5km easy jog",
+      ].join("\n"),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((msg) => msg.includes("whole-number"))).toBe(true);
+  });
 });

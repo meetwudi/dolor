@@ -291,8 +291,8 @@ export const buildIntervalsWorkoutText = ({ sections }: WorkoutPlanInput) => {
 
 const STEP_PREFIX = /^-\s+/;
 
-const DURATION_PATTERN = /\b\d+(?:\.\d+)?(?:h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds)\b|\b\d+m\d+\b/gi;
-const DISTANCE_PATTERN = /\b\d+(?:\.\d+)?(?:km|mi|m|meter|meters|yd|yds)\b/gi;
+const DURATION_PATTERN = /\b\d+(?:h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds)\b|\b\d+m\d+\b/gi;
+const DISTANCE_PATTERN = /\b\d+(?:km|mi|m|meter|meters|yd|yds)\b/gi;
 const PERCENT_PATTERN = /\b\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?%\s*(?:FTP|HR|max|LTHR|pace)?\b/gi;
 const ZONE_PATTERN = /\bZ\d+(?:\s*(?:HR|Pace))?\b/gi;
 const POWER_PATTERN = /\b\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\s*(?:w|W|w\/kg|W\/kg)\b/gi;
@@ -300,6 +300,8 @@ const CADENCE_PATTERN = /\b\d+(?:-\d+)?\s*(?:rpm|RPM)\b/gi;
 const RAMP_PATTERN =
   /\bramp\s+(?:z\d+(?:\s*(?:hr|pace))?|\d+(?:\.\d+)?)(?:-(?:z\d+(?:\s*(?:hr|pace))?|\d+(?:\.\d+)?))?(?:\s*(?:%|% FTP|% HR|% LTHR|w|W|w\/kg|W\/kg))?\b/gi;
 const PACE_PATTERN = /\b\d+:\d+(?:-\d+:\d+)?\/(?:km|mi)\b/gi;
+const DECIMAL_DURATION_DISTANCE_PATTERN =
+  /\b\d+\.\d+(?:h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds|km|mi|m|meter|meters|yd|yds)\b/gi;
 
 export type ParsedWorkoutStep = {
   raw: string;
@@ -373,6 +375,12 @@ const parseStepLine = (line: string, lineNumber: number): ParsedWorkoutStep & { 
   }
 
   const [content, notePart] = withoutPrefix.split("#", 2);
+  const decimalMatches = findMatches(DECIMAL_DURATION_DISTANCE_PATTERN, withoutPrefix);
+  if (decimalMatches.length) {
+    errors.push(
+      `Line ${lineNumber}: Use whole-number durations/distances (e.g., replace ${decimalMatches[0]} with 5h30m or 1500m).`,
+    );
+  }
   const durations = findMatches(DURATION_PATTERN, content);
   const distances = findMatches(DISTANCE_PATTERN, content);
   if (!durations.length && !distances.length) {

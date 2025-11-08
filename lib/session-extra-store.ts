@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import isProduction from "./environment";
 
 export type SessionExtraData = Record<string, unknown>;
 
@@ -15,7 +16,7 @@ type SessionExtraStoreOptions = {
 
 const DEFAULT_KEY_PREFIX = "agent-session-extra:";
 
-const DEFAULT_TTL_SECONDS = 600;
+const DEFAULT_TTL_SECONDS: number | undefined = isProduction() ? undefined : 600;
 
 export class SessionExtraStore {
   private readonly redis: Redis;

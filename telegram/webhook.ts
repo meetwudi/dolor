@@ -21,6 +21,7 @@ import {
   getTextDeltaFromEvent,
 } from "../lib/run-stream-utils";
 import { withSessionContext } from "../lib/session-context";
+import isProduction from "../lib/environment";
 
 type TelegramUser = {
   id: number;
@@ -60,7 +61,7 @@ type SessionState = {
 
 const TELEGRAM_CHAR_LIMIT = 4096;
 const UPDATE_DEDUPE_TTL_SECONDS = 600;
-const SESSION_TTL_SECONDS = 600;
+const SESSION_TTL_SECONDS: number | undefined = isProduction() ? undefined : 600;
 const LOCAL_SESSION_TTL_MS = 10 * 60 * 1000;
 const redis = Redis.fromEnv();
 
@@ -87,7 +88,10 @@ const getInstructionKey = (athleteId?: string) =>
   athleteId ? `athlete:${athleteId}` : "athlete:none";
 
 const createSession = (sessionId: string): Session =>
-  new UpstashSession({ sessionId, ttlSeconds: SESSION_TTL_SECONDS });
+  new UpstashSession({
+    sessionId,
+    ...(SESSION_TTL_SECONDS !== undefined ? { ttlSeconds: SESSION_TTL_SECONDS } : {}),
+  });
 
 const createSessionState = (key: string): SessionState => ({
   session: createSession(key),

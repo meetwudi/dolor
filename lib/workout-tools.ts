@@ -17,6 +17,7 @@ Intervals.icu Workout DSL
   • Cadence: "95rpm", "70-80rpm".
   • Text before the first duration/distance becomes the on-device prompt; trailing "# note" becomes a comment.
   • You can mix multiple targets (e.g., "90% FTP 95rpm").
+  • Durations and distances use whole numbers—write 5h30m instead of 5.5h, 1500m instead of 1.5km.
 - Pick one modality per workout: do not mix HR-targeted and power-targeted steps in the same plan (pace-only workouts are fine on their own).
 - Repeats: put "Nx" on the section line or in free text ("Main Set 3x") then enumerate the repeated steps.
 - Examples:
@@ -29,6 +30,9 @@ Intervals.icu Workout DSL
 
   Cooldown
   - 10m 60% FTP easy spin
+
+  Long Endurance
+  - 5h30m 70% FTP smooth endurance
 `.trim();
 
 export const buildIntervalsWorkoutTool = tool({

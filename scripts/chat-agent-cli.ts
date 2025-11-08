@@ -18,9 +18,10 @@ import {
   getTextDeltaFromEvent,
 } from "../lib/run-stream-utils";
 import { withSessionContext } from "../lib/session-context";
+import isProduction from "../lib/environment";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "q", ":q"]);
-const SESSION_TTL_SECONDS = 600;
+const SESSION_TTL_SECONDS: number | undefined = isProduction() ? undefined : 600;
 
 const streamCliRun = async (
   result: StreamedRunResult<any, any>,
@@ -70,7 +71,9 @@ async function main() {
   const athleteId = parsed.values["athlete-id"];
 
   const rl = readline.createInterface({ input: stdin, output: stdout });
-  const session = new UpstashSession({ ttlSeconds: SESSION_TTL_SECONDS });
+  const session = new UpstashSession(
+    SESSION_TTL_SECONDS !== undefined ? { ttlSeconds: SESSION_TTL_SECONDS } : undefined,
+  );
 
   console.log(
     athleteId
