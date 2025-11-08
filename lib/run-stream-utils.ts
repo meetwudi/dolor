@@ -98,6 +98,18 @@ const TOOL_LABELS: Record<
     userCall: "Saving your athlete ID…",
     userDone: "Athlete ID ready for future chats.",
   },
+  build_intervals_workout: {
+    cliCall: "[tool] Building Intervals.icu workout text",
+    cliDone: "[tool] build_intervals_workout completed",
+    userCall: "Translating that plan into workout text…",
+    userDone: "Workout text ready.",
+  },
+  validate_intervals_workout: {
+    cliCall: "[tool] Validating Intervals.icu workout text",
+    cliDone: "[tool] validate_intervals_workout completed",
+    userCall: "Double-checking the workout format…",
+    userDone: "Workout format verified.",
+  },
 };
 
 const truncate = (text: string, max = 280) =>

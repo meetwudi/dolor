@@ -13,6 +13,10 @@ import { getCurrentTimeTool } from "./timezone-tool";
 import { getLocalWeatherForecastTool } from "./weather-tool";
 import { sessionGetAthleteIdTool, sessionSetAthleteIdTool } from "./athlete-tools";
 import { getSessionIdTool } from "./session-tools";
+import {
+  buildIntervalsWorkoutTool,
+  validateIntervalsWorkoutTool,
+} from "./workout-tools";
 export const fitnessAgent = new Agent({
   name: "Dolor",
   model: "gpt-5",
@@ -32,5 +36,7 @@ export const fitnessAgent = new Agent({
     sessionGetAthleteIdTool,
     sessionSetAthleteIdTool,
     webSearchTool(),
+    buildIntervalsWorkoutTool,
+    validateIntervalsWorkoutTool,
   ],
 });
