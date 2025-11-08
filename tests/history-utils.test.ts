@@ -40,6 +40,20 @@ describe("cleanHistoryItems", () => {
     expect(cleaned[1]?.type).toBe("message");
   });
 
+  test("drops reasoning items whose following entry is not an assistant message", () => {
+    const functionCall: AgentInputItem = {
+      type: "function_call",
+      name: "test",
+    } as any;
+    const items: AgentInputItem[] = [
+      { type: "reasoning", content: [] } as any,
+      functionCall,
+    ];
+
+    const cleaned = cleanHistoryItems(items);
+    expect(cleaned).toEqual([functionCall]);
+  });
+
   test("preserves reasoning + message pairs", () => {
     const reasoning: AgentInputItem = {
       type: "reasoning",
