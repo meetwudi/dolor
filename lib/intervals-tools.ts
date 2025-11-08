@@ -65,7 +65,7 @@ export const listIntervalsActivitiesTool = tool({
     athleteId: z
       .string()
       .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (usually numeric)."),
+      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     oldest: z
       .string()
       .describe(
@@ -133,7 +133,7 @@ export const getIntervalsWellnessRecordTool = tool({
     athleteId: z
       .string()
       .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (usually numeric)."),
+      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     date: z
       .string()
       .min(1, "date is required")
@@ -154,7 +154,7 @@ export const updateIntervalsWellnessCommentTool = tool({
     athleteId: z
       .string()
       .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (usually numeric)."),
+      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     date: z
       .string()
       .describe("Date in YYYY-MM-DD format to match the wellness entry."),
@@ -202,7 +202,7 @@ export const listIntervalsWellnessRecordsTool = tool({
     athleteId: z
       .string()
       .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (usually numeric)."),
+      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     ext: z
       .string()
       .describe(

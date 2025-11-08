@@ -20,6 +20,7 @@ import {
   getLogLineFromEvent,
   getTextDeltaFromEvent,
 } from "../lib/run-stream-utils";
+import { withSessionContext } from "../lib/session-context";
 
 type TelegramUser = {
   id: number;
@@ -121,7 +122,9 @@ const ensureIntervalsInstruction = async (state: SessionState) => {
   const instructionKey = getInstructionKey(state.athleteId);
   if (state.lastInstructionKey === instructionKey) return;
 
-  await state.session.addItems([system(buildIntervalsInstruction(state.athleteId))]);
+  await state.session.addItems([
+    system(buildIntervalsInstruction({ athleteId: state.athleteId })),
+  ]);
   state.lastInstructionKey = instructionKey;
 };
 
@@ -382,11 +385,14 @@ export const createTelegramWebhookHandler = ({
     await ensureIntervalsInstruction(state);
 
     try {
-      const result = await run(fitnessAgent, [user(text)], {
-        session: state.session,
-        sessionInputCallback: appendHistory,
-        stream: true,
-      });
+      const sessionId = await state.session.getSessionId();
+      const result = await withSessionContext({ sessionId }, () =>
+        run(fitnessAgent, [user(text)], {
+          session: state.session,
+          sessionInputCallback: appendHistory,
+          stream: true,
+        }),
+      );
       await streamTelegramRunResult(
         apiBaseUrl,
         message.chat.id,

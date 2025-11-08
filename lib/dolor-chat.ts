@@ -8,6 +8,7 @@ import {
   type SessionInputCallback,
 } from "@openai/agents";
 import { fitnessAgent } from "./fitness-agent";
+import { withSessionContext } from "./session-context";
 
 const LARGE_INTERVAL_TOOLS = new Set([
   "list_intervals_activities",
@@ -69,7 +70,11 @@ export type GreetingOptions = {
   athleteId?: string;
 };
 
-export const buildIntervalsInstruction = (athleteId?: string) => {
+export type IntervalsInstructionOptions = {
+  athleteId?: string;
+};
+
+export const buildIntervalsInstruction = ({ athleteId }: IntervalsInstructionOptions = {}) => {
   const intervalsGuidance = athleteId
     ? `You can query Intervals.icu for athlete ${athleteId}.`
     : "Ask the athlete for their Intervals.icu athlete ID before calling any intervals.icu tool";
@@ -83,17 +88,20 @@ export const sendDolorGreeting = async ({
   session,
   athleteId,
 }: GreetingOptions) => {
+  const sessionId = await session.getSessionId();
   const items: AgentInputItem[] = [
-    system(buildIntervalsInstruction(athleteId)),
+    system(buildIntervalsInstruction({ athleteId })),
     user(
       "Start the session with a concise, encouraging greeting and invite the athlete to share what they need help with today.",
     ),
   ];
 
-  const result = await run(fitnessAgent, items, {
-    session,
-    sessionInputCallback: appendHistory,
-  });
+  const result = await withSessionContext({ sessionId }, () =>
+    run(fitnessAgent, items, {
+      session,
+      sessionInputCallback: appendHistory,
+    }),
+  );
 
   return typeof result.finalOutput === "string"
     ? result.finalOutput

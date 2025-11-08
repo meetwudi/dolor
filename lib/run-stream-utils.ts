@@ -80,6 +80,24 @@ const TOOL_LABELS: Record<
     userCall: "Checking the local weather forecast…",
     userDone: "Forecast ready.",
   },
+  get_session_id: {
+    cliCall: "[tool] Calling get_session_id",
+    cliDone: "[tool] get_session_id completed",
+    userCall: "Grabbing your session ID…",
+    userDone: "Session ID ready.",
+  },
+  session_get_athlete_id: {
+    cliCall: "[tool] Calling session_get_athlete_id",
+    cliDone: "[tool] session_get_athlete_id completed",
+    userCall: "Looking up your saved athlete ID…",
+    userDone: "Athlete ID retrieved.",
+  },
+  session_set_athlete_id: {
+    cliCall: "[tool] Calling session_set_athlete_id",
+    cliDone: "[tool] session_set_athlete_id completed",
+    userCall: "Saving your athlete ID…",
+    userDone: "Athlete ID ready for future chats.",
+  },
 };
 
 const truncate = (text: string, max = 280) =>

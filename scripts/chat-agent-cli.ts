@@ -17,6 +17,7 @@ import {
   getLogLineFromEvent,
   getTextDeltaFromEvent,
 } from "../lib/run-stream-utils";
+import { withSessionContext } from "../lib/session-context";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "q", ":q"]);
 const SESSION_TTL_SECONDS = 600;
@@ -86,11 +87,14 @@ async function main() {
     if (EXIT_COMMANDS.has(input.toLowerCase())) break;
 
     try {
-      const result = await run(fitnessAgent, [user(input)], {
-        session,
-        sessionInputCallback: appendHistory,
-        stream: true,
-      });
+      const sessionId = await session.getSessionId();
+      const result = await withSessionContext({ sessionId }, () =>
+        run(fitnessAgent, [user(input)], {
+          session,
+          sessionInputCallback: appendHistory,
+          stream: true,
+        }),
+      );
       await streamCliRun(result as any);
     } catch (error) {
       console.error(

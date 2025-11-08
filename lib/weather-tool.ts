@@ -71,7 +71,7 @@ const pickHourlyEntries = (response: OpenMeteoResponse, hoursAhead: number) => {
   const hourly = response.hourly ?? {};
   const timeValues: string[] = Array.isArray(hourly.time) ? hourly.time : [];
   const limit = Math.min(timeValues.length, hoursAhead);
-  const result = [];
+  const result: any[] = [];
   for (let i = 0; i < limit; i += 1) {
     result.push({
       time: timeValues[i],
