@@ -39,23 +39,25 @@ const dropLargeToolOutputs = (items: AgentInputItem[]) =>
     return true;
   });
 
-const removeOrphanReasoning = (items: AgentInputItem[]) => {
-  const cleaned: AgentInputItem[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item?.type !== "reasoning") {
-      cleaned.push(item);
-      continue;
-    }
-    const next = items[i + 1];
-    if (next && next.type === "message" && next.role === "assistant") {
-      cleaned.push(item);
-      continue;
-    }
-    // Drop dangling reasoning item
+const dropReasoningItems = (items: AgentInputItem[]) =>
+  items.filter((item) => item?.type !== "reasoning");
+
+const stripReasoningReferences = (item: AgentInputItem) => {
+  const cloned = structuredClone(item);
+  if (!cloned || typeof cloned !== "object") {
+    return cloned;
   }
-  return cleaned;
+  if ("reasoning" in cloned) {
+    delete (cloned as { reasoning?: unknown }).reasoning;
+  }
+  if ("reasoning_id" in cloned) {
+    delete (cloned as { reasoning_id?: unknown }).reasoning_id;
+  }
+  if ("reasoningId" in cloned) {
+    delete (cloned as { reasoningId?: unknown }).reasoningId;
+  }
+  return cloned;
 };
 
 export const cleanHistoryItems = (items: AgentInputItem[]): AgentInputItem[] =>
-  removeOrphanReasoning(dropLargeToolOutputs(items)).map((item) => structuredClone(item));
+  dropReasoningItems(dropLargeToolOutputs(items)).map((item) => stripReasoningReferences(item));

@@ -27,41 +27,37 @@ describe("cleanHistoryItems", () => {
     expect(cleaned[0]).toEqual(buildAssistantMessage("kept"));
   });
 
-  test("drops reasoning items that are not followed by a message", () => {
-    const items: AgentInputItem[] = [
-      { type: "reasoning", content: [{ type: "text", text: "thinking" }] } as any,
-      buildAssistantMessage("answer"),
-      { type: "reasoning", content: [{ type: "text", text: "dangling" }] } as any,
-    ];
-
-    const cleaned = cleanHistoryItems(items);
-    expect(cleaned).toHaveLength(2);
-    expect(cleaned[0]?.type).toBe("reasoning");
-    expect(cleaned[1]?.type).toBe("message");
-  });
-
-  test("drops reasoning items whose following entry is not an assistant message", () => {
-    const functionCall: AgentInputItem = {
-      type: "function_call",
-      name: "test",
-    } as any;
-    const items: AgentInputItem[] = [
-      { type: "reasoning", content: [] } as any,
-      functionCall,
-    ];
-
-    const cleaned = cleanHistoryItems(items);
-    expect(cleaned).toEqual([functionCall]);
-  });
-
-  test("preserves reasoning + message pairs", () => {
+  test("drops all reasoning items", () => {
     const reasoning: AgentInputItem = {
       type: "reasoning",
       content: [{ type: "text", text: "plan" }],
     } as any;
     const message = buildAssistantMessage("done");
     const cleaned = cleanHistoryItems([reasoning, message]);
-    expect(cleaned).toEqual([reasoning, message]);
+    expect(cleaned).toEqual([message]);
+  });
+
+  test("removes reasoning references from assistant messages", () => {
+    const message: AgentInputItem = {
+      ...buildAssistantMessage("with plan"),
+      reasoning: { id: "rs_123" },
+    } as any;
+    const cleaned = cleanHistoryItems([message]);
+    expect(cleaned[0]).toEqual(buildAssistantMessage("with plan"));
+    expect((cleaned[0] as any).reasoning).toBeUndefined();
+  });
+
+  test("removes reasoning references from tool calls", () => {
+    const toolCall: AgentInputItem = {
+      type: "tool",
+      name: "test_tool",
+      reasoning: { id: "rs_tool" },
+    } as any;
+    const cleaned = cleanHistoryItems([toolCall]);
+    expect(cleaned[0]).toEqual({
+      type: "tool",
+      name: "test_tool",
+    });
   });
 
   test("returns cloned items so callers cannot mutate the stored history", () => {
