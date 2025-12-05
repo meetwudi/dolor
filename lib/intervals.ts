@@ -482,8 +482,8 @@ const ActivitySchema = z.object({
   icu_zone_times: z
     .array(
       z.object({
-        id: z.string(),
-        secs: z.number(),
+        id: z.union([z.string(), z.number()]).nullish(),
+        secs: z.number().nullish(),
       }),
     )
     .nullish(),
@@ -494,10 +494,10 @@ const ActivitySchema = z.object({
   custom_zones: z
     .array(
       z.object({
-        code: z.string(),
+        code: z.string().nullish(),
         zones: z.array(
           z.object({
-            id: z.string(),
+            id: z.union([z.string(), z.number()]).nullish(),
             start: z.number(),
             end: z.number(),
             start_value: z.number(),
@@ -513,9 +513,9 @@ const ActivitySchema = z.object({
   icu_achievements: z
     .array(
       z.object({
-        id: z.string(),
+        id: z.union([z.string(), z.number()]).nullish(),
         type: AchievementTypeEnum,
-        message: z.string(),
+        message: z.string().nullish(),
         watts: z.number().nullish(),
         secs: z.number().nullish(),
         value: z.number().nullish(),
@@ -570,10 +570,10 @@ const ActivitySchema = z.object({
   attachments: z
     .array(
       z.object({
-        id: z.string(),
-        filename: z.string(),
-        mimetype: z.string(),
-        url: z.string(),
+        id: z.union([z.string(), z.number()]).nullish(),
+        filename: z.string().nullish(),
+        mimetype: z.string().nullish(),
+        url: z.string().nullish(),
       }),
     )
     .nullish(),
