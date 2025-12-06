@@ -41,10 +41,12 @@ describe("cleanHistoryItems", () => {
     const message: AgentInputItem = {
       ...buildAssistantMessage("with plan"),
       reasoning: { id: "rs_123" },
+      id: "msg_1",
     } as any;
     const cleaned = cleanHistoryItems([message]);
     expect(cleaned[0]).toEqual(buildAssistantMessage("with plan"));
     expect((cleaned[0] as any).reasoning).toBeUndefined();
+    expect((cleaned[0] as any).id).toBeUndefined();
   });
 
   test("removes reasoning references from tool calls", () => {
@@ -52,12 +54,14 @@ describe("cleanHistoryItems", () => {
       type: "tool",
       name: "test_tool",
       reasoning: { id: "rs_tool" },
+      id: "call_1",
     } as any;
     const cleaned = cleanHistoryItems([toolCall]);
     expect(cleaned[0]).toEqual({
       type: "tool",
       name: "test_tool",
     });
+    expect((cleaned[0] as any).id).toBeUndefined();
   });
 
   test("returns cloned items so callers cannot mutate the stored history", () => {
