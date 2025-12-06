@@ -19,6 +19,11 @@ describe("cleanHistoryItems", () => {
         type: "metadata" as any,
         some: { nested: "get_intervals_activity_intervals" },
       },
+      {
+        type: "tool",
+        name: "get_intervals_activity",
+        id: "call",
+      },
       buildAssistantMessage("kept"),
     ];
 

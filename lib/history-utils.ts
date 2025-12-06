@@ -3,8 +3,10 @@ import type { AgentInputItem } from "@openai/agents";
 const LARGE_INTERVAL_TOOLS = new Set([
   "list_intervals_activities",
   "list_intervals_events",
+  "get_intervals_activity",
   "get_intervals_activity_intervals",
   "list_intervals_chat_messages",
+  "list_intervals_wellness_records",
   "update_intervals_event",
   "create_intervals_event",
 ]);
