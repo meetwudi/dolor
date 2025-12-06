@@ -19,6 +19,14 @@
     {
       "source": "/api/telegram",
       "destination": "/api/telegram"
+    },
+    {
+      "source": "/connect",
+      "destination": "/api/connect"
+    },
+    {
+      "source": "/auth/intervals/callback",
+      "destination": "/api/intervals-callback"
     }
   ]
 }

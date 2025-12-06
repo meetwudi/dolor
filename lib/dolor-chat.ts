@@ -29,8 +29,8 @@ export type IntervalsInstructionOptions = {
 
 export const buildIntervalsInstruction = ({ athleteId }: IntervalsInstructionOptions = {}) => {
   const intervalsGuidance = athleteId
-    ? `You can query Intervals.icu for athlete ${athleteId}.`
-    : "Ask the athlete for their Intervals.icu athlete ID before calling any intervals.icu tool";
+    ? `You already have Intervals.icu access for athlete ${athleteId}.`
+    : "If the athlete hasn't connected Intervals.icu yet, remind them to visit the Dolor link (or run /connect in Telegram) before you attempt any Intervals tools.";
 
   return `${intervalsGuidance}
 - If the user did not ask for a workout, do not suggest a workout.

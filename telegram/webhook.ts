@@ -5,12 +5,17 @@ import {
 } from "@vercel/queue";
 import { run, system, user, type Agent, type Session } from "@openai/agents";
 import { Redis } from "@upstash/redis";
+import {
+  createTelegramConnectToken,
+  getTelegramIntervalsCredential,
+} from "../lib/intervals-oauth-store";
 import { fitnessAgent } from "../lib/fitness-agent";
 import {
   appendHistory,
   buildIntervalsInstruction,
   sendDolorGreeting,
 } from "../lib/dolor-chat";
+import { sessionExtraStore } from "../lib/session-extra-store";
 import { UpstashSession } from "../lib/upstash-session";
 import { getFinalResponseText } from "../lib/run-stream-utils";
 import { withSessionContext } from "../lib/session-context";
@@ -50,6 +55,8 @@ type SessionState = {
   athleteId?: string;
   lastInstructionKey?: string;
   expiresAt?: number;
+  intervalsAccessToken?: string;
+  intervalsScope?: string;
 };
 
 const TELEGRAM_CHAR_LIMIT = 4096;
@@ -200,8 +207,9 @@ const parseCommand = (text: string) => {
   const trimmed = text.trim();
   const [rawCommand, ...args] = trimmed.split(/\s+/);
   if (!rawCommand) return null;
-  const command = rawCommand.toLowerCase();
-  return { command, args };
+  const normalized = rawCommand.split("@")[0]?.toLowerCase();
+  if (!normalized) return null;
+  return { command: normalized, args, raw: rawCommand };
 };
 
 export type TelegramQueuePayload = {
@@ -215,7 +223,11 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
     command: string,
     args: string[],
     messageId: number,
+    message: TelegramMessage,
   ) => {
+    console.log(
+      `[Telegram] Handling command ${command} (args: ${args.join(" ") || "<none>"}) for chat ${chatId}`,
+    );
     switch (command) {
       case "/start": {
         const state = ensureSessionState(key);
@@ -228,7 +240,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
         await sendTextResponse(
           apiBaseUrl,
           chatId,
-          "You can set your Intervals.icu athlete ID any time with /athlete <id>. Use /help to see all commands.",
+          "Use /connect to link your Intervals.icu account. Run /help to see all commands.",
         );
         return true;
       }
@@ -236,7 +248,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
         const helpMessage = [
           "Available commands:",
           "/start — receive Dolor's greeting and current context",
-          "/athlete <id> — pin an Intervals.icu athlete for tool calls",
+          "/connect — link your Intervals.icu account",
           "/reset — drop the current chat history",
         ].join("\n");
         await sendTextResponse(apiBaseUrl, chatId, helpMessage, messageId);
@@ -252,30 +264,88 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
         );
         return true;
       }
-      case "/athlete": {
-        const athleteId = args[0];
-        if (!athleteId) {
+      case "/connect": {
+        if (!message.from?.id) {
           await sendTextResponse(
             apiBaseUrl,
             chatId,
-            "Usage: /athlete <id>",
+            "I need to know who is asking before generating a connect link.",
             messageId,
           );
           return true;
         }
-        const state = ensureSessionState(key);
-        state.athleteId = athleteId;
-        state.lastInstructionKey = undefined;
+        const baseUrl = Bun.env.PUBLIC_BASE_URL;
+        if (!baseUrl) {
+          await sendTextResponse(
+            apiBaseUrl,
+            chatId,
+            "Set PUBLIC_BASE_URL in the server environment before using /connect.",
+            messageId,
+          );
+          return true;
+        }
+        if (!Bun.env.INTERVALS_CLIENT_ID) {
+          await sendTextResponse(
+            apiBaseUrl,
+            chatId,
+            "Set INTERVALS_CLIENT_ID in the server environment before using /connect.",
+            messageId,
+          );
+          return true;
+        }
+        const token = await createTelegramConnectToken({
+          telegramUserId: message.from.id,
+          telegramUsername: message.from.username,
+        });
+        const link = new URL("/connect", baseUrl);
+        link.searchParams.set("token", token);
         await sendTextResponse(
           apiBaseUrl,
           chatId,
-          `Got it. I'll use athlete ID ${athleteId} the next time Dolor calls Intervals.icu.`,
+          [
+            "Tap this link to connect your Intervals.icu account (link expires in 15 minutes):",
+            link.toString(),
+          ].join("\n"),
           messageId,
         );
         return true;
       }
       default:
+        console.log(
+          `[Telegram] Command ${command} not handled; falling back to regular message flow`,
+        );
         return false;
+    }
+  };
+
+  const syncIntervalsCredential = async (
+    state: SessionState,
+    telegramUser?: TelegramUser,
+  ) => {
+    const telegramUserId = telegramUser?.id;
+    if (!telegramUserId) return;
+    const credential = await getTelegramIntervalsCredential(telegramUserId);
+    if (!credential) return;
+    if (
+      state.intervalsAccessToken === credential.accessToken &&
+      state.athleteId === credential.athleteId
+    ) {
+      return;
+    }
+    state.athleteId = credential.athleteId;
+    state.intervalsAccessToken = credential.accessToken;
+    state.intervalsScope = credential.scope;
+    state.lastInstructionKey = undefined;
+    try {
+      const sessionId = await state.session.getSessionId();
+      await sessionExtraStore.merge(sessionId, {
+        athleteId: credential.athleteId,
+        intervalsAccessToken: credential.accessToken,
+        intervalsScope: credential.scope,
+        intervalsAthleteName: credential.athleteName ?? undefined,
+      });
+    } catch (error) {
+      console.error("Failed to persist session credential data", error);
     }
   };
 
@@ -313,6 +383,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
         command.command,
         command.args,
         message.message_id,
+        message,
       );
       if (handled) {
         console.log(
@@ -323,6 +394,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
     }
 
     const state = ensureSessionState(chatKey);
+    await syncIntervalsCredential(state, message.from);
     await ensureIntervalsInstruction(state);
 
     try {

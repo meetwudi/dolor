@@ -14,7 +14,6 @@ import {
 } from "./intervals-tools";
 import { getCurrentTimeTool } from "./timezone-tool";
 import { getLocalWeatherForecastTool } from "./weather-tool";
-import { sessionGetAthleteIdTool, sessionSetAthleteIdTool } from "./athlete-tools";
 import { getSessionIdTool } from "./session-tools";
 import {
   buildIntervalsWorkoutTool,
@@ -37,8 +36,6 @@ export const fitnessAgent = new Agent({
     getCurrentTimeTool,
     getLocalWeatherForecastTool,
     getSessionIdTool,
-    sessionGetAthleteIdTool,
-    sessionSetAthleteIdTool,
     webSearchTool(),
     buildIntervalsWorkoutTool,
     validateIntervalsWorkoutTool,

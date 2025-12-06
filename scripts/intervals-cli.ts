@@ -6,7 +6,7 @@ const usage = () => `
 Usage: bun scripts/intervals-cli.ts --athlete-id <id> [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--limit 50] [--json]
 
 Environment:
-  INTERVALS_API_KEY   Required. API key from https://intervals.icu (Settings → API).
+  INTERVALS_ACCESS_TOKEN   Required. OAuth access token from Intervals.icu (generate via /connect).
 `.trim();
 
 const main = async () => {
@@ -51,7 +51,11 @@ const main = async () => {
   const end = args.end ?? dateDefaults.end;
 
   try {
-    const client = new IntervalsClient();
+    const accessToken = Bun.env.INTERVALS_ACCESS_TOKEN;
+    if (!accessToken) {
+      throw new Error("Missing INTERVALS_ACCESS_TOKEN environment variable.");
+    }
+    const client = new IntervalsClient({ accessToken });
     const activities = await client.listActivities({
       athleteId: args.athleteId,
       oldest: start,
