@@ -35,7 +35,7 @@ To disable delivery (while still letting Telegram log updates) call `deleteWebho
 
 ## 4. Optional: Vercel Queue
 
-If you want Telegram updates to ack immediately and process asynchronously, create a Vercel Queue topic named `telegram-updates`. The consumer group is hard-coded to `telegram-webhook`, so use those exact names in your queue configuration (no environment variables required).
+If you want Telegram updates to ack immediately and process asynchronously, create a Vercel Queue topic named `telegram-updates-v2`. The consumer group is hard-coded to `telegram-webhook`, so use those exact names in your queue configuration (no environment variables required).
 
 Update `vercel.json` so Vercel knows which topic/consumer should trigger `/api/queue`:
 
@@ -46,7 +46,7 @@ Update `vercel.json` so Vercel knows which topic/consumer should trigger `/api/q
       "experimentalTriggers": [
         {
           "type": "queue/v1beta",
-          "topic": "telegram-updates",
+          "topic": "telegram-updates-v2",
           "consumer": "telegram-webhook"
         }
       ]

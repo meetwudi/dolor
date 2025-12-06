@@ -9,7 +9,7 @@
       "experimentalTriggers": [
         {
           "type": "queue/v1beta",
-          "topic": "telegram-updates",
+          "topic": "telegram-updates-v2",
           "consumer": "telegram-webhook"
         }
       ]

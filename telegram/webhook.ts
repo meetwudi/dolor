@@ -350,7 +350,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
   };
 };
 
-export const TELEGRAM_QUEUE_TOPIC = "telegram-updates";
+export const TELEGRAM_QUEUE_TOPIC = "telegram-updates-v2";
 export const TELEGRAM_QUEUE_CONSUMER = "telegram-webhook";
 
 export type TelegramWebhookHandlerOptions = {
