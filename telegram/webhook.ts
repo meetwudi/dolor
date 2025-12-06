@@ -280,8 +280,14 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
   };
 
   return async (update: TelegramUpdate) => {
+    const chatId =
+      update.message?.chat.id ?? update.edited_message?.chat.id ?? "unknown";
+    console.log(`[Telegram] Processing update ${update.update_id} for chat ${chatId}`);
     const message = update.message ?? update.edited_message;
     if (!message) {
+      console.log(
+        `[Telegram] Update ${update.update_id} has no message payload; skipping`,
+      );
       return;
     }
 
@@ -293,6 +299,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
         "Dolor can only read text messages for now.",
         message.message_id,
       );
+      console.log(`[Telegram] Update ${update.update_id} skipped due to missing text`);
       return;
     }
 
@@ -307,7 +314,12 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
         command.args,
         message.message_id,
       );
-      if (handled) return;
+      if (handled) {
+        console.log(
+          `[Telegram] Update ${update.update_id} handled via command ${command.command}`,
+        );
+        return;
+      }
     }
 
     const state = ensureSessionState(chatKey);
@@ -325,6 +337,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
       if (reply) {
         await sendTextResponse(apiBaseUrl, message.chat.id, reply, message.message_id);
       }
+      console.log(`[Telegram] Finished update ${update.update_id}`);
     } catch (error) {
       console.error("Dolor Telegram run failed", error);
       await sendTextResponse(
@@ -398,13 +411,15 @@ export const createTelegramWebhookHandler = ({
       return new Response("No message to process", { status: 200 });
     }
 
-    if (queueClient && queueTopic) {
-      try {
-        await queueClient.send(queueTopic, { update });
-        return new Response("Queued", { status: 200 });
-      } catch (error) {
-        console.error("Failed to enqueue Telegram update; processing inline", error);
-      }
+    try {
+      console.log(`[Telegram] Enqueuing update ${update.update_id} -> ${queueTopic}`);
+      const { messageId } = await queueClient.send(queueTopic, { update });
+      console.log(
+        `[Telegram] Enqueued update ${update.update_id} as queue message ${messageId}`,
+      );
+      return new Response("Queued", { status: 200 });
+    } catch (error) {
+      console.error("Failed to enqueue Telegram update; processing inline", error);
     }
 
     await processUpdate(update);
@@ -426,6 +441,12 @@ export const createTelegramQueueConsumer = (): MessageHandler => {
       console.warn("Received queue payload without 'update'; skipping");
       return;
     }
+    console.log(
+      `[Telegram] Queue consumer handling message ${_metadata?.messageId ?? "unknown"} (update ${typedPayload.update.update_id})`,
+    );
     await processUpdate(typedPayload.update);
+    console.log(
+      `[Telegram] Queue consumer completed message ${_metadata?.messageId ?? "unknown"} (update ${typedPayload.update.update_id})`,
+    );
   };
 };
