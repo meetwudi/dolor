@@ -95,18 +95,6 @@ const TOOL_LABELS: Record<
     userCall: "Grabbing your session ID…",
     userDone: "Session ID ready.",
   },
-  session_get_athlete_id: {
-    cliCall: "[tool] Calling session_get_athlete_id",
-    cliDone: "[tool] session_get_athlete_id completed",
-    userCall: "Looking up your saved athlete ID…",
-    userDone: "Athlete ID retrieved.",
-  },
-  session_set_athlete_id: {
-    cliCall: "[tool] Calling session_set_athlete_id",
-    cliDone: "[tool] session_set_athlete_id completed",
-    userCall: "Saving your athlete ID…",
-    userDone: "Athlete ID ready for future chats.",
-  },
   build_intervals_workout: {
     cliCall: "[tool] Building Intervals.icu workout text",
     cliDone: "[tool] build_intervals_workout completed",

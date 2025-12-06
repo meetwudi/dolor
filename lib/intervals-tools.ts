@@ -1,7 +1,8 @@
 import { tool } from "@openai/agents";
 import { z } from "zod";
 import {
-  IntervalsClient,
+  createIntervalsClientForSession,
+  requireIntervalsClientWithAthlete,
   type Activity,
   type ActivityIntervals,
   type ActivityMessage,
@@ -75,12 +76,8 @@ const summarizeEvent = (event: Event) => ({
 export const listIntervalsActivitiesTool = tool({
   name: "list_intervals_activities",
   description:
-    "Fetch Intervals.icu activities for an athlete within a date range. Defaults to the last 7 days ending today in the athlete's San Francisco (America/Los_Angeles) timezone when no dates are given—do NOT ask the user to confirm this fallback. Returns summary rows (name, start_time, duration, type, power_load/hr_load).",
+    "Fetch the connected athlete's Intervals.icu activities within a date range. Defaults to the last 7 days ending today in the athlete's San Francisco (America/Los_Angeles) timezone when no dates are given—do NOT ask the user to confirm this fallback. Returns summary rows (name, start_time, duration, type, power_load/hr_load).",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     oldest: z
       .string()
       .describe(
@@ -92,7 +89,7 @@ export const listIntervalsActivitiesTool = tool({
         "End date (YYYY-MM-DD). Use an empty string to default to today in America/Los_Angeles.",
       ),
   }),
-  execute: async ({ athleteId, oldest, newest }) => {
+  execute: async ({ oldest, newest }) => {
     const defaultRange = getDefaultActivityDateRange();
     const resolvedOldest = oldest.trim()
       ? oldest
@@ -101,7 +98,7 @@ export const listIntervalsActivitiesTool = tool({
       ? newest
       : defaultRange.newest;
 
-    const client = new IntervalsClient();
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const activities = await client.listActivities({
       athleteId,
       oldest: resolvedOldest,
@@ -121,12 +118,8 @@ export const listIntervalsActivitiesTool = tool({
 export const listIntervalsEventsTool = tool({
   name: "list_intervals_events",
   description:
-    "List Intervals.icu calendar events (planned workouts, races, notes, etc.). Defaults to the last 7 days ending today in America/Los_Angeles when no dates are provided—do NOT stop to confirm that range, just mention it. The `description` field contains the workout text for structured workouts, so read/write it when you need the athlete-facing prescription.",
+    "List the connected athlete's Intervals.icu calendar events (planned workouts, races, notes, etc.). Defaults to the last 7 days ending today in America/Los_Angeles when no dates are provided—do NOT stop to confirm that range, just mention it. The `description` field contains the workout text for structured workouts, so read/write it when you need the athlete-facing prescription.",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     oldest: z
       .string()
       .describe(
@@ -163,16 +156,7 @@ export const listIntervalsEventsTool = tool({
         "Locale code (en, es, de, etc.) for multi-lingual workouts, or empty to use the athlete default.",
       ),
   }),
-  execute: async ({
-    athleteId,
-    oldest,
-    newest,
-    categories,
-    limit,
-    calendarId,
-    resolve,
-    locale,
-  }) => {
+  execute: async ({ oldest, newest, categories, limit, calendarId, resolve, locale }) => {
     const defaultRange = getDefaultActivityDateRange();
     const resolvedOldest = oldest.trim()
       ? oldest
@@ -198,9 +182,8 @@ export const listIntervalsEventsTool = tool({
         : resolve.trim().toLowerCase() === "true";
     const resolvedLocale = locale.trim() || undefined;
 
-    const client = new IntervalsClient();
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const events = await client.listEvents({
-      athleteId,
       oldest: resolvedOldest,
       newest: resolvedNewest,
       categories: resolvedCategories,
@@ -226,10 +209,6 @@ export const updateIntervalsEventTool = tool({
   description:
     "Update an Intervals.icu calendar event (planned workout, race, or note). Patching the `description` field is the way to store the workout text you generated. Supply only the fields you intend to modify via payload_json (e.g., {\"description\": \"...\"}).",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier."),
     eventId: z
       .union([z.string(), z.number()])
       .describe("Event identifier from list_intervals_events."),
@@ -240,7 +219,7 @@ export const updateIntervalsEventTool = tool({
         "Stringified JSON body to send to Intervals.icu. Include only the fields you want to update (e.g., description, start_date_local, target).",
       ),
   }),
-  execute: async ({ athleteId, eventId, payload_json }) => {
+  execute: async ({ eventId, payload_json }) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(payload_json);
@@ -250,7 +229,7 @@ export const updateIntervalsEventTool = tool({
       throw new Error(`Failed to parse payload_json: ${message}`);
     }
 
-    const client = new IntervalsClient();
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const event = await client.updateEvent({
       athleteId,
       eventId,
@@ -266,10 +245,6 @@ export const createIntervalsEventTool = tool({
   description:
     "Create an Intervals.icu calendar event (planned workout, race, note, etc.). Populate the `description` field with workout text when you generate a structured workout. Set upsertOnUid to true when you want to update an existing event that shares the same UID instead of creating a duplicate.",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier."),
     payload_json: z
       .string()
       .min(2, "payload_json must not be empty")
@@ -282,7 +257,7 @@ export const createIntervalsEventTool = tool({
         "Set to 'true' to update an existing event with the same uid; leave empty to always create a new event.",
       ),
   }),
-  execute: async ({ athleteId, payload_json, upsertOnUid }) => {
+  execute: async ({ payload_json, upsertOnUid }) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(payload_json);
@@ -297,7 +272,7 @@ export const createIntervalsEventTool = tool({
         ? undefined
         : upsertOnUid.trim().toLowerCase() === "true";
 
-    const client = new IntervalsClient();
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const event = await client.createEvent({
       athleteId,
       data,
@@ -325,7 +300,7 @@ export const getIntervalsActivityTool = tool({
       ),
   }),
   execute: async ({ activityId, includeIntervals }) => {
-    const client = new IntervalsClient();
+    const client = await createIntervalsClientForSession();
     return client.getActivity({ activityId, includeIntervals });
   },
 });
@@ -333,19 +308,15 @@ export const getIntervalsActivityTool = tool({
 export const getIntervalsWellnessRecordTool = tool({
   name: "get_intervals_wellness_record",
   description:
-    "Fetch a single Intervals.icu wellness record for an athlete on a specific local date (YYYY-MM-DD). Records include CTL/ATL/rampRate loads, weight, restingHR, HRV + SDNN, sleep duration/score/quality, avg sleep HR, soreness/fatigue/stress/mood/motivation/injury, SpO2, blood pressure, hydration + volume, readiness/Baevsky SI, calories, steps, respiration, menstrual phases, body fat/abdomen/VO2max, blood glucose, lactate, comments, and sport-specific FTP/CP metrics.",
+    "Fetch a single Intervals.icu wellness record for the connected athlete on a specific local date (YYYY-MM-DD). Records include CTL/ATL/rampRate loads, weight, restingHR, HRV + SDNN, sleep duration/score/quality, avg sleep HR, soreness/fatigue/stress/mood/motivation/injury, SpO2, blood pressure, hydration + volume, readiness/Baevsky SI, calories, steps, respiration, menstrual phases, body fat/abdomen/VO2max, blood glucose, lactate, comments, and sport-specific FTP/CP metrics.",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     date: z
       .string()
       .min(1, "date is required")
       .describe("Local date in YYYY-MM-DD format."),
   }),
-  execute: async ({ athleteId, date }) => {
-    const client = new IntervalsClient();
+  execute: async ({ date }) => {
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const record = await client.getWellnessRecord({ athleteId, date });
     return record;
   },
@@ -354,12 +325,8 @@ export const getIntervalsWellnessRecordTool = tool({
 export const updateIntervalsWellnessCommentTool = tool({
   name: "update_intervals_wellness_comment",
   description:
-    "Update the wellness comment for an Intervals.icu athlete on a specific date. Use this tool to log notes about the athlete on a given day (especially when they volunteer how they're doing today) and do NOT need to re-confirm with them before logging.",
+    "Update the wellness comment for the connected Intervals.icu athlete on a specific date. Use this tool to log notes about the athlete on a given day (especially when they volunteer how they're doing today) and do NOT need to re-confirm with them before logging.",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     date: z
       .string()
       .describe("Date in YYYY-MM-DD format to match the wellness entry."),
@@ -368,10 +335,10 @@ export const updateIntervalsWellnessCommentTool = tool({
       .min(1, "comments cannot be empty")
       .describe("Freeform wellness note to store for that date."),
   }),
-  execute: async ({ athleteId, date, comments }) => {
+  execute: async ({ date, comments }) => {
     console.log("[Updating wellness records...]");
 
-    const client = new IntervalsClient();
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const record = await client.updateWellnessRecord({
       athleteId,
       date,
@@ -402,12 +369,8 @@ export const updateIntervalsWellnessCommentTool = tool({
 export const listIntervalsWellnessRecordsTool = tool({
   name: "list_intervals_wellness_records",
   description:
-    "List Intervals.icu wellness records (same CTL/ATL/rampRate, weight, restingHR/HRV, sleep, soreness/fatigue/stress/mood/motivation/injury, SpO2, BP, hydration, readiness, calories, steps, respiration, menstrual phases, composition, blood glucose, lactate, comments, sport FTP metrics, etc.) for an athlete between two local dates. Provide '.csv' in ext for CSV output or leave blank for JSON—the response tells you which via its `format` field. cols/fields are comma-separated lists; use empty strings when no filtering is needed.",
+    "List Intervals.icu wellness records (same CTL/ATL/rampRate, weight, restingHR/HRV, sleep, soreness/fatigue/stress/mood/motivation/injury, SpO2, BP, hydration, readiness, calories, steps, respiration, menstrual phases, composition, blood glucose, lactate, comments, sport FTP metrics, etc.) for the connected athlete between two local dates. Provide '.csv' in ext for CSV output or leave blank for JSON—the response tells you which via its `format` field. cols/fields are comma-separated lists; use empty strings when no filtering is needed.",
   parameters: z.object({
-    athleteId: z
-      .string()
-      .min(1, "athleteId is required")
-      .describe("Intervals.icu athlete identifier (alphanumeric string)."),
     ext: z
       .string()
       .describe(
@@ -432,8 +395,8 @@ export const listIntervalsWellnessRecordsTool = tool({
         "Comma separated JSON fields to include. Use an empty string for defaults.",
       ),
   }),
-  execute: async ({ athleteId, ext, oldest, newest, cols, fields }) => {
-    const client = new IntervalsClient();
+  execute: async ({ ext, oldest, newest, cols, fields }) => {
+    const { client, athleteId } = await requireIntervalsClientWithAthlete();
     const result: ListWellnessRecordsResult =
       await client.listWellnessRecords({
         athleteId,
@@ -459,7 +422,7 @@ export const getIntervalsActivityIntervalsTool = tool({
       ),
   }),
   execute: async ({ activityId }) => {
-    const client = new IntervalsClient();
+    const client = await createIntervalsClientForSession();
     const resolvedId =
       typeof activityId === "number" ? activityId.toString() : activityId;
     if (!resolvedId) {
@@ -492,7 +455,7 @@ export const addIntervalsActivityCommentTool = tool({
       .describe("The message to post. Keep it concise and actionable."),
   }),
   execute: async ({ activityId, content }) => {
-    const client = new IntervalsClient();
+    const client = await createIntervalsClientForSession();
     const result = await client.addActivityMessage({
       activityId,
       content,
@@ -525,7 +488,7 @@ export const listIntervalsChatMessagesTool = tool({
       .describe("Maximum number of messages to return. Use 0 to accept the default (30)."),
   }),
   execute: async ({ chatId, beforeId, limit }) => {
-    const client = new IntervalsClient();
+    const client = await createIntervalsClientForSession();
     const trimmedBefore = beforeId.trim();
     const messages = await client.listChatMessages({
       chatId,

@@ -1,5 +1,6 @@
-import { Buffer } from "node:buffer";
 import { z } from "zod";
+import { getSessionContext } from "./session-context";
+import { sessionExtraStore } from "./session-extra-store";
 
 const SubTypeEnum = z.enum(["NONE", "COMMUTE", "WARMUP", "COOLDOWN", "RACE"]);
 const GapModelEnum = z.enum(["NONE", "STRAVA_RUN"]);
@@ -782,19 +783,26 @@ export type ListWellnessRecordsResult =
 const DEFAULT_BASE_URL = "https://intervals.icu/api/v1";
 
 export class IntervalsClient {
-  readonly apiKey: string;
+  readonly accessToken: string;
   readonly baseUrl: string;
 
-  constructor(options?: { apiKey?: string; baseUrl?: string }) {
-    const apiKey = options?.apiKey ?? Bun.env.INTERVALS_API_KEY;
-    if (!apiKey) {
+  constructor(options: { accessToken: string; baseUrl?: string }) {
+    const accessToken = options?.accessToken?.trim();
+    if (!accessToken) {
       throw new Error(
-        "Missing Intervals.icu API key. Set INTERVALS_API_KEY in your environment.",
+        "IntervalsClient requires an OAuth access token (call /connect in Telegram to generate one).",
       );
     }
-
-    this.apiKey = apiKey;
+    this.accessToken = accessToken;
     this.baseUrl = options?.baseUrl ?? DEFAULT_BASE_URL;
+  }
+
+  private buildHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this.accessToken}`,
+      Accept: "application/json",
+      ...extra,
+    };
   }
 
   async listActivities(params: ListActivitiesParams): Promise<Activity[]> {
@@ -811,10 +819,7 @@ export class IntervalsClient {
 
     const url = `${this.baseUrl}/athlete/${athleteId}/activities?${qs.toString()}`;
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
-      },
+      headers: this.buildHeaders(),
     });
 
     if (!response.ok) {
@@ -871,10 +876,7 @@ export class IntervalsClient {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const url = `${this.baseUrl}/athlete/${athleteId}/events${suffix}`;
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
-      },
+      headers: this.buildHeaders(),
     });
 
     if (!response.ok) {
@@ -904,10 +906,7 @@ export class IntervalsClient {
     });
     const url = `${this.baseUrl}/activity/${id}?${qs.toString()}`;
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
-      },
+      headers: this.buildHeaders(),
     });
 
     if (!response.ok) {
@@ -938,11 +937,9 @@ export class IntervalsClient {
     const url = `${this.baseUrl}/athlete/${athleteId}/wellness/${date}`;
     const response = await fetch(url, {
       method: "PUT",
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
+      headers: this.buildHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(payload),
     });
 
@@ -967,10 +964,7 @@ export class IntervalsClient {
 
     const url = `${this.baseUrl}/athlete/${athleteId}/wellness/${date}`;
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
-      },
+      headers: this.buildHeaders(),
     });
 
     if (!response.ok) {
@@ -1015,10 +1009,9 @@ export class IntervalsClient {
 
     const expectCsv = trimmedExt === ".csv";
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
+      headers: this.buildHeaders({
         Accept: expectCsv ? "text/csv" : "application/json",
-      },
+      }),
     });
 
     if (!response.ok) {
@@ -1050,10 +1043,7 @@ export class IntervalsClient {
     const id = String(activityId);
     const url = `${this.baseUrl}/activity/${id}/intervals`;
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
-      },
+      headers: this.buildHeaders(),
     });
 
     if (!response.ok) {
@@ -1089,11 +1079,9 @@ export class IntervalsClient {
     const url = `${this.baseUrl}/activity/${String(activityId)}/messages`;
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
+      headers: this.buildHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({ content }),
     });
 
@@ -1137,10 +1125,7 @@ export class IntervalsClient {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const url = `${this.baseUrl}/chats/${String(chatId)}/messages${suffix}`;
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
-      },
+      headers: this.buildHeaders(),
     });
 
     if (!response.ok) {
@@ -1169,11 +1154,9 @@ export class IntervalsClient {
     const url = `${this.baseUrl}/athlete/${athleteId}/events${suffix}`;
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
+      headers: this.buildHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(data),
     });
 
@@ -1197,11 +1180,9 @@ export class IntervalsClient {
     const url = `${this.baseUrl}/athlete/${athleteId}/events/${String(eventId)}`;
     const response = await fetch(url, {
       method: "PUT",
-      headers: {
-        Authorization: `Basic ${encodeApiKey(this.apiKey)}`,
-        Accept: "application/json",
+      headers: this.buildHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(data),
     });
 
@@ -1217,7 +1198,74 @@ export class IntervalsClient {
   }
 }
 
-const encodeApiKey = (apiKey: string) => {
-  const token = Buffer.from(`API_KEY:${apiKey}`);
-  return token.toString("base64");
+const pickSessionAccessToken = (data?: Record<string, unknown>) => {
+  const raw = data?.intervalsAccessToken;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+};
+
+const pickSessionAthleteId = (data?: Record<string, unknown>) => {
+  const raw = data?.athleteId;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+};
+
+const pickSessionScope = (data?: Record<string, unknown>) => {
+  const raw = data?.intervalsScope;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+};
+
+const pickSessionAthleteName = (data?: Record<string, unknown>) => {
+  const raw = data?.intervalsAthleteName;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+};
+
+export type SessionIntervalsCredentials = {
+  athleteId: string;
+  accessToken: string;
+  scope?: string | null;
+  athleteName?: string | null;
+};
+
+export const getSessionIntervalsCredentials =
+  async (): Promise<SessionIntervalsCredentials | null> => {
+    const context = getSessionContext();
+    if (!context?.sessionId) return null;
+    const record = await sessionExtraStore.get(context.sessionId);
+    const athleteId = pickSessionAthleteId(record?.data);
+    const accessToken = pickSessionAccessToken(record?.data);
+    if (!athleteId || !accessToken) return null;
+    return {
+      athleteId,
+      accessToken,
+      scope: pickSessionScope(record?.data),
+      athleteName: pickSessionAthleteName(record?.data),
+    };
+  };
+
+const missingCredentialError = () =>
+  new Error(
+    "This chat isn't connected to Intervals.icu yet. Ask the athlete to run /connect and try again.",
+  );
+
+export const requireSessionIntervalsCredentials =
+  async (): Promise<SessionIntervalsCredentials> => {
+    const creds = await getSessionIntervalsCredentials();
+    if (!creds) {
+      throw missingCredentialError();
+    }
+    return creds;
+  };
+
+export const createIntervalsClientForSession = async (): Promise<IntervalsClient> => {
+  const { accessToken } = await requireSessionIntervalsCredentials();
+  return new IntervalsClient({ accessToken });
+};
+
+export const requireIntervalsClientWithAthlete = async () => {
+  const creds = await requireSessionIntervalsCredentials();
+  return {
+    client: new IntervalsClient({ accessToken: creds.accessToken }),
+    athleteId: creds.athleteId,
+    athleteName: creds.athleteName ?? null,
+    scope: creds.scope ?? null,
+  };
 };

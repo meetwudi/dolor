@@ -2,16 +2,26 @@
 
 This document explains how to run the Dolor Telegram bot locally for development and how to deploy it on Vercel.
 
-> Prerequisites: Bun ≥ 1.1, a Telegram bot token from [@BotFather](https://t.me/BotFather), and access to an Intervals.icu API key.
+> Prerequisites: Bun ≥ 1.1, a Telegram bot token from [@BotFather](https://t.me/BotFather), and an Intervals.icu OAuth client (client id + secret from david@intervals.icu).
 
 ## 1. Environment variables
 
 Set these locally (e.g. in `.env`) and in your Vercel project:
 
 - `OPENAI_API_KEY`
-- `INTERVALS_API_KEY`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_SECRET_TOKEN` — any random string; Telegram will include it in the `x-telegram-bot-api-secret-token` header so we can verify webhook authenticity.
+- `PUBLIC_BASE_URL` — the fully qualified URL serving `web/index.ts` (e.g. `https://dolor.app`). Telegram connect links redirect here.
+- `INTERVALS_CLIENT_ID` and `INTERVALS_CLIENT_SECRET` — OAuth credentials provisioned by david@intervals.icu so users can authorize Dolor without sharing API keys.
+
+## 1.1 Connecting athletes via OAuth
+
+1. Deploy/run `bun --hot web/index.ts` at the origin referenced by `PUBLIC_BASE_URL`.
+2. In Telegram, users run `/connect`.
+3. The bot DM’s a short-lived link to `${PUBLIC_BASE_URL}/connect?token=...`.
+4. The Bun server exchanges the Intervals.icu OAuth code at `/auth/intervals/callback` and stores the resulting access token under the Telegram user id.
+
+Once authorized, Dolor automatically injects the athlete id + bearer token into tool calls, so the user never has to type `/athlete` again. Tokens live in Redis indefinitely; rerun `/connect` to rotate or re-consent.
 
 ## 2. Run the webhook locally
 
@@ -63,8 +73,8 @@ These names must match the hard-coded values in the source. When deployed, Verce
 
 ## 6. Telegram commands
 
-- `/start` — Dolor greets you and reminds you how to pin an athlete.
-- `/athlete <id>` — pins an Intervals.icu athlete so Dolor fills tool calls automatically.
+- `/start` — Dolor greets you and reminds you how to connect if needed.
+- `/connect` — sends a personal OAuth link so Dolor can access your Intervals.icu data without sharing API keys.
 - `/reset` — clears the chat’s memory and starts fresh.
 - `/help` — lists all commands.
 
