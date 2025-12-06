@@ -16,7 +16,7 @@ const webhookHandler = createTelegramWebhookHandler({
 
 export default async function handler(req: NodeRequest, res: NodeResponse) {
   try {
-    const request = toRequest(req);
+    const request = await toRequest(req);
     const response = await webhookHandler(request);
     await sendResponse(res, response);
   } catch (error) {

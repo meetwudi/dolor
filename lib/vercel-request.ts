@@ -27,18 +27,33 @@ const buildHeaders = (req: NodeRequest) => {
   return headers;
 };
 
-const getBody = (req: NodeRequest): BodyInit | undefined => {
-  if (req.method === "GET" || req.method === "HEAD") return undefined;
-  const body = req.body ?? (req as any).rawBody;
-  if (!body) return undefined;
-  if (typeof body === "string") return body;
-  if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
-    return body as unknown as BodyInit;
+const readStreamBody = async (req: NodeRequest) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+    } else {
+      chunks.push(chunk);
+    }
   }
-  return JSON.stringify(body) as BodyInit;
+  if (chunks.length === 0) return undefined;
+  return Buffer.concat(chunks);
 };
 
-export const toRequest = (req: NodeRequest) => {
+const getBody = async (req: NodeRequest): Promise<BodyInit | undefined> => {
+  if (req.method === "GET" || req.method === "HEAD") return undefined;
+  const body = req.body ?? (req as any).rawBody;
+  if (body !== undefined && body !== null) {
+    if (typeof body === "string") return body;
+    if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
+      return body as unknown as BodyInit;
+    }
+    return JSON.stringify(body) as BodyInit;
+  }
+  return (await readStreamBody(req)) as BodyInit | undefined;
+};
+
+export const toRequest = async (req: NodeRequest) => {
   const protocol =
     (req.headers["x-forwarded-proto"] as string | undefined) ?? "https";
   const host =
@@ -48,10 +63,11 @@ export const toRequest = (req: NodeRequest) => {
   const origin = `${protocol}://${host}`;
   const url = new URL(req.url ?? "/api/telegram", origin);
 
+  const body = await getBody(req);
   return new Request(url, {
     method: req.method,
     headers: buildHeaders(req),
-    body: getBody(req),
+    body,
   });
 };
 
