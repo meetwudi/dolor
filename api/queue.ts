@@ -1,5 +1,9 @@
 import { Client } from "@vercel/queue";
-import { createTelegramQueueConsumer } from "../telegram/webhook";
+import {
+  createTelegramQueueConsumer,
+  TELEGRAM_QUEUE_CONSUMER,
+  TELEGRAM_QUEUE_TOPIC,
+} from "../telegram/webhook";
 import {
   toRequest,
   sendResponse,
@@ -7,28 +11,19 @@ import {
   type NodeResponse,
 } from "../lib/vercel-request";
 
-const botToken = Bun.env.TELEGRAM_BOT_TOKEN ?? "";
-const queueTopic = Bun.env.TELEGRAM_QUEUE_TOPIC;
-const consumerGroup = Bun.env.TELEGRAM_QUEUE_CONSUMER ?? "telegram-webhook";
+const queueTopic = TELEGRAM_QUEUE_TOPIC;
+const consumerGroup = TELEGRAM_QUEUE_CONSUMER;
 
-const queueClient = queueTopic ? new Client() : null;
-const queueConsumer = botToken ? createTelegramQueueConsumer({ botToken }) : null;
+const queueClient = new Client();
+const queueConsumer = createTelegramQueueConsumer();
 
-const queueHandler =
-  queueClient && queueConsumer && queueTopic
-    ? queueClient.handleCallback({
-        [queueTopic]: {
-          [consumerGroup]: queueConsumer,
-        },
-      })
-    : null;
+const queueHandler = queueClient.handleCallback({
+  [queueTopic]: {
+    [consumerGroup]: queueConsumer,
+  },
+});
 
 export default async function handler(req: NodeRequest, res: NodeResponse) {
-  if (!queueHandler) {
-    console.error("Queue callback invoked but TELEGRAM_QUEUE_TOPIC or TELEGRAM_BOT_TOKEN missing");
-    res.status(500).json({ error: "Queue not configured" });
-    return;
-  }
   try {
     const request = toRequest(req);
     const response = await queueHandler(request);

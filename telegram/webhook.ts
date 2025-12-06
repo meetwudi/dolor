@@ -337,16 +337,17 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
   };
 };
 
+export const TELEGRAM_QUEUE_TOPIC = "telegram-updates";
+export const TELEGRAM_QUEUE_CONSUMER = "telegram-webhook";
+
 export type TelegramWebhookHandlerOptions = {
   botToken: string;
   secretToken?: string;
-  queueTopic?: string;
 };
 
 export const createTelegramWebhookHandler = ({
   botToken,
   secretToken,
-  queueTopic = Bun.env.TELEGRAM_QUEUE_TOPIC,
 }: TelegramWebhookHandlerOptions) => {
   if (!botToken) {
     throw new Error("createTelegramWebhookHandler requires a TELEGRAM_BOT_TOKEN");
@@ -358,7 +359,8 @@ export const createTelegramWebhookHandler = ({
 
   const apiBaseUrl = `https://api.telegram.org/bot${botToken}`;
   const processUpdate = createTelegramUpdateProcessor(apiBaseUrl);
-  const queueClient = queueTopic ? new Client() : null;
+  const queueClient = new Client();
+  const queueTopic = TELEGRAM_QUEUE_TOPIC;
 
   return async (request: Request) => {
     if (request.method === "GET") {
@@ -410,13 +412,10 @@ export const createTelegramWebhookHandler = ({
   };
 };
 
-export const createTelegramQueueConsumer = ({
-  botToken,
-}: {
-  botToken: string;
-}): MessageHandler => {
+export const createTelegramQueueConsumer = (): MessageHandler => {
+  const botToken = Bun.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
-    throw new Error("createTelegramQueueConsumer requires a TELEGRAM_BOT_TOKEN");
+    throw new Error("TELEGRAM_BOT_TOKEN must be set to create the queue consumer");
   }
   const apiBaseUrl = `https://api.telegram.org/bot${botToken}`;
   const processUpdate = createTelegramUpdateProcessor(apiBaseUrl);

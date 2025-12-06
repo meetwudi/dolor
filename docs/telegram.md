@@ -35,10 +35,7 @@ To disable delivery (while still letting Telegram log updates) call `deleteWebho
 
 ## 4. Optional: Vercel Queue
 
-If you want Telegram updates to ack immediately and process asynchronously, configure a Vercel Queue topic and set these env vars:
-
-- `TELEGRAM_QUEUE_TOPIC` — the queue topic slug (e.g. `telegram-updates`).
-- `TELEGRAM_QUEUE_CONSUMER` — optional consumer group name; defaults to `telegram-webhook`.
+If you want Telegram updates to ack immediately and process asynchronously, create a Vercel Queue topic named `telegram-updates`. The consumer group is hard-coded to `telegram-webhook`, so use those exact names in your queue configuration (no environment variables required).
 
 Update `vercel.json` so Vercel knows which topic/consumer should trigger `/api/queue`:
 
@@ -58,7 +55,7 @@ Update `vercel.json` so Vercel knows which topic/consumer should trigger `/api/q
 }
 ```
 
-Replace the topic/consumer names with your actual queue settings. When deployed, Vercel Queue will call `/api/queue` via `Client.handleCallback`. The Telegram webhook now enqueues updates (and falls back to inline processing if enqueueing fails). For local development leave `TELEGRAM_QUEUE_TOPIC` unset so messages are processed inline without a queue.
+These names must match the hard-coded values in the source. When deployed, Vercel Queue will call `/api/queue` via `Client.handleCallback`. The Telegram webhook now enqueues updates (and falls back to inline processing if enqueueing fails). Locally you don't need to run a queue; the enqueue attempt will fail and the webhook will process inline automatically.
 
 ## 5. Deploy to Vercel
 
