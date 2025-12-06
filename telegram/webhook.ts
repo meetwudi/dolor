@@ -1,3 +1,8 @@
+import {
+  Client,
+  type MessageHandler,
+  type MessageMetadata,
+} from "@vercel/queue";
 import { run, system, user, type Agent, type Session } from "@openai/agents";
 import { Redis } from "@upstash/redis";
 import { fitnessAgent } from "../lib/fitness-agent";
@@ -7,7 +12,7 @@ import {
   sendDolorGreeting,
 } from "../lib/dolor-chat";
 import { UpstashSession } from "../lib/upstash-session";
-import { getFinalResponseText, getLogLineFromEvent } from "../lib/run-stream-utils";
+import { getFinalResponseText } from "../lib/run-stream-utils";
 import { withSessionContext } from "../lib/session-context";
 import isProduction from "../lib/environment";
 
@@ -199,25 +204,11 @@ const parseCommand = (text: string) => {
   return { command, args };
 };
 
-export type TelegramWebhookHandlerOptions = {
-  botToken: string;
-  secretToken?: string;
+export type TelegramQueuePayload = {
+  update: TelegramUpdate;
 };
 
-export const createTelegramWebhookHandler = ({
-  botToken,
-  secretToken,
-}: TelegramWebhookHandlerOptions) => {
-  if (!botToken) {
-    throw new Error("createTelegramWebhookHandler requires a TELEGRAM_BOT_TOKEN");
-  }
-
-  if (!Bun.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY must be set to chat with Dolor.");
-  }
-
-  const apiBaseUrl = `https://api.telegram.org/bot${botToken}`;
-
+const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
   const handleCommand = async (
     chatId: number,
     key: string,
@@ -288,6 +279,87 @@ export const createTelegramWebhookHandler = ({
     }
   };
 
+  return async (update: TelegramUpdate) => {
+    const message = update.message ?? update.edited_message;
+    if (!message) {
+      return;
+    }
+
+    const text = message.text?.trim();
+    if (!text) {
+      await sendTextResponse(
+        apiBaseUrl,
+        message.chat.id,
+        "Dolor can only read text messages for now.",
+        message.message_id,
+      );
+      return;
+    }
+
+    const chatKey = getChatKey(message.chat.id, message.message_thread_id);
+
+    const command = parseCommand(text);
+    if (command) {
+      const handled = await handleCommand(
+        message.chat.id,
+        chatKey,
+        command.command,
+        command.args,
+        message.message_id,
+      );
+      if (handled) return;
+    }
+
+    const state = ensureSessionState(chatKey);
+    await ensureIntervalsInstruction(state);
+
+    try {
+      const sessionId = await state.session.getSessionId();
+      const result = await withSessionContext({ sessionId }, () =>
+        run(fitnessAgent, [user(text)], {
+          session: state.session,
+          sessionInputCallback: appendHistory,
+        }),
+      );
+      const reply = (await getFinalResponseText(result)).trim();
+      if (reply) {
+        await sendTextResponse(apiBaseUrl, message.chat.id, reply, message.message_id);
+      }
+    } catch (error) {
+      console.error("Dolor Telegram run failed", error);
+      await sendTextResponse(
+        apiBaseUrl,
+        message.chat.id,
+        "Dolor hit an error. Please try again in a moment.",
+        message.message_id,
+      );
+    }
+  };
+};
+
+export type TelegramWebhookHandlerOptions = {
+  botToken: string;
+  secretToken?: string;
+  queueTopic?: string;
+};
+
+export const createTelegramWebhookHandler = ({
+  botToken,
+  secretToken,
+  queueTopic = Bun.env.TELEGRAM_QUEUE_TOPIC,
+}: TelegramWebhookHandlerOptions) => {
+  if (!botToken) {
+    throw new Error("createTelegramWebhookHandler requires a TELEGRAM_BOT_TOKEN");
+  }
+
+  if (!Bun.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY must be set to chat with Dolor.");
+  }
+
+  const apiBaseUrl = `https://api.telegram.org/bot${botToken}`;
+  const processUpdate = createTelegramUpdateProcessor(apiBaseUrl);
+  const queueClient = queueTopic ? new Client() : null;
+
   return async (request: Request) => {
     if (request.method === "GET") {
       return new Response(
@@ -324,56 +396,37 @@ export const createTelegramWebhookHandler = ({
       return new Response("No message to process", { status: 200 });
     }
 
-    const text = message.text?.trim();
-    if (!text) {
-      await sendTextResponse(
-        apiBaseUrl,
-        message.chat.id,
-        "Dolor can only read text messages for now.",
-        message.message_id,
-      );
-      return new Response("OK");
-    }
-
-    const chatKey = getChatKey(message.chat.id, message.message_thread_id);
-
-    const command = parseCommand(text);
-    if (command) {
-      const handled = await handleCommand(
-        message.chat.id,
-        chatKey,
-        command.command,
-        command.args,
-        message.message_id,
-      );
-      if (handled) return new Response("OK");
-    }
-
-    const state = ensureSessionState(chatKey);
-    await ensureIntervalsInstruction(state);
-
-    try {
-      const sessionId = await state.session.getSessionId();
-      const result = await withSessionContext({ sessionId }, () =>
-        run(fitnessAgent, [user(text)], {
-          session: state.session,
-          sessionInputCallback: appendHistory,
-        }),
-      );
-      const reply = (await getFinalResponseText(result)).trim();
-      if (reply) {
-        await sendTextResponse(apiBaseUrl, message.chat.id, reply, message.message_id);
+    if (queueClient && queueTopic) {
+      try {
+        await queueClient.send(queueTopic, { update });
+        return new Response("Queued", { status: 200 });
+      } catch (error) {
+        console.error("Failed to enqueue Telegram update; processing inline", error);
       }
-    } catch (error) {
-      console.error("Dolor Telegram run failed", error);
-      await sendTextResponse(
-        apiBaseUrl,
-        message.chat.id,
-        "Dolor hit an error. Please try again in a moment.",
-        message.message_id,
-      );
     }
 
+    await processUpdate(update);
     return new Response("OK");
+  };
+};
+
+export const createTelegramQueueConsumer = ({
+  botToken,
+}: {
+  botToken: string;
+}): MessageHandler => {
+  if (!botToken) {
+    throw new Error("createTelegramQueueConsumer requires a TELEGRAM_BOT_TOKEN");
+  }
+  const apiBaseUrl = `https://api.telegram.org/bot${botToken}`;
+  const processUpdate = createTelegramUpdateProcessor(apiBaseUrl);
+
+  return async (payload: unknown, _metadata?: MessageMetadata) => {
+    const typedPayload = payload as TelegramQueuePayload | undefined;
+    if (!typedPayload?.update) {
+      console.warn("Received queue payload without 'update'; skipping");
+      return;
+    }
+    await processUpdate(typedPayload.update);
   };
 };

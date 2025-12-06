@@ -33,11 +33,38 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
 
 To disable delivery (while still letting Telegram log updates) call `deleteWebhook` the same way.
 
-## 4. Deploy to Vercel
+## 4. Optional: Vercel Queue
+
+If you want Telegram updates to ack immediately and process asynchronously, configure a Vercel Queue topic and set these env vars:
+
+- `TELEGRAM_QUEUE_TOPIC` — the queue topic slug (e.g. `telegram-updates`).
+- `TELEGRAM_QUEUE_CONSUMER` — optional consumer group name; defaults to `telegram-webhook`.
+
+Update `vercel.json` so Vercel knows which topic/consumer should trigger `/api/queue`:
+
+```json
+{
+  "functions": {
+    "api/queue.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v1beta",
+          "topic": "telegram-updates",
+          "consumer": "telegram-webhook"
+        }
+      ]
+    }
+  }
+}
+```
+
+Replace the topic/consumer names with your actual queue settings. When deployed, Vercel Queue will call `/api/queue` via `Client.handleCallback`. The Telegram webhook now enqueues updates (and falls back to inline processing if enqueueing fails). For local development leave `TELEGRAM_QUEUE_TOPIC` unset so messages are processed inline without a queue.
+
+## 5. Deploy to Vercel
 
 `vercel.json` runs `bun install`, `bun run build`, and serves `api/telegram` with the Bun runtime. After `vercel deploy`, rerun the `setWebhook` command above using the production domain so Telegram sends updates directly to Vercel.
 
-## 5. Telegram commands
+## 6. Telegram commands
 
 - `/start` — Dolor greets you and reminds you how to pin an athlete.
 - `/athlete <id>` — pins an Intervals.icu athlete so Dolor fills tool calls automatically.
