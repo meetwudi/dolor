@@ -49,10 +49,7 @@ const stripReasoningReferences = (item: AgentInputItem) => {
   if (!cloned || typeof cloned !== "object") {
     return cloned;
   }
-  if (
-    "id" in cloned &&
-    ((cloned as AgentInputItem).type === "message" || (cloned as AgentInputItem).type === "tool")
-  ) {
+  if ("id" in cloned) {
     delete (cloned as { id?: unknown }).id;
   }
   if ("reasoning" in cloned) {
