@@ -85,12 +85,51 @@ export class UpstashSession implements Session {
   }
 
   private keepMostRecent(items: AgentInputItem[]): AgentInputItem[] {
+    const repair = (window: AgentInputItem[]) => {
+      const knownCallIds = new Set<string>();
+      const maybeRecordCallId = (item: any) => {
+        const explicitCallId =
+          typeof item?.call_id === "string" ? item.call_id : null;
+        const id =
+          typeof item?.id === "string" ? item.id : null;
+        const type = typeof item?.type === "string" ? item.type : "";
+        if (explicitCallId && !type.includes("output")) {
+          knownCallIds.add(explicitCallId);
+          return;
+        }
+        if (
+          id &&
+          (type.includes("call") ||
+            type === "tool" ||
+            type === "function_call")
+        ) {
+          knownCallIds.add(id);
+        }
+      };
+
+      const repaired: AgentInputItem[] = [];
+      for (const item of window) {
+        const typed = item as any;
+        const type = typeof typed?.type === "string" ? typed.type : "";
+        const outputCallId =
+          type.includes("output") && typeof typed?.call_id === "string"
+            ? typed.call_id
+            : null;
+        if (outputCallId && !knownCallIds.has(outputCallId)) {
+          continue;
+        }
+        repaired.push(item);
+        maybeRecordCallId(typed);
+      }
+      return repaired;
+    };
+
     if (this.maxItems <= 0) {
       return [];
     }
     if (items.length <= this.maxItems) {
-      return items;
+      return repair(items);
     }
-    return items.slice(items.length - this.maxItems);
+    return repair(items.slice(items.length - this.maxItems));
   }
 }
