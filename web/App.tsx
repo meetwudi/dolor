@@ -337,20 +337,6 @@ export function App() {
             </a>
             <p className="auth-note">Sign in to continue.</p>
           </div>
-          <div className="welcome-points">
-            <article>
-              <h2>Ask</h2>
-              <p>Talk to Dolor about training, recovery, and workouts.</p>
-            </article>
-            <article>
-              <h2>Threads</h2>
-              <p>Keep topics organized across separate conversations.</p>
-            </article>
-            <article>
-              <h2>Simple</h2>
-              <p>Mobile-friendly chat with no extra steps.</p>
-            </article>
-          </div>
         </div>
       </div>
     );
