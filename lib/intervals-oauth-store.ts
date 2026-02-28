@@ -25,7 +25,46 @@ const generateUUID = () => {
   return segments.join("-");
 };
 
-const redis = Redis.fromEnv();
+type Store = {
+  set: (key: string, value: unknown, ttlSeconds?: number) => Promise<void>;
+  get: <T>(key: string) => Promise<T | null>;
+  del: (key: string) => Promise<void>;
+};
+
+const hasRedisEnv = () =>
+  !!(Bun.env.KV_REST_API_URL || Bun.env.KV_URL || Bun.env.REDIS_URL) &&
+  !!(Bun.env.KV_REST_API_TOKEN || Bun.env.KV_REST_API_READ_ONLY_TOKEN);
+
+const memory = new Map<string, unknown>();
+
+const store: Store = hasRedisEnv()
+  ? (() => {
+      const redis = Redis.fromEnv();
+      return {
+        async set(key: string, value: unknown, ttlSeconds?: number) {
+          await redis.set(key, value, ttlSeconds ? { ex: ttlSeconds } : undefined);
+        },
+        async get<T>(key: string) {
+          const value = await redis.get<T>(key);
+          if (value === undefined || value === null) return null;
+          return value;
+        },
+        async del(key: string) {
+          await redis.del(key);
+        },
+      };
+    })()
+  : {
+      async set(key: string, value: unknown) {
+        memory.set(key, structuredClone(value));
+      },
+      async get<T>(key: string) {
+        return (memory.get(key) as T | undefined) ?? null;
+      },
+      async del(key: string) {
+        memory.delete(key);
+      },
+    };
 
 const CONNECT_TOKEN_PREFIX = "intervals:connect:";
 const CONNECT_TOKEN_TTL_SECONDS = 15 * 60;
@@ -42,10 +81,10 @@ export const createTelegramConnectToken = async (
   payload: TelegramConnectPayload,
 ): Promise<string> => {
   const token = generateUUID().replace(/-/g, "");
-  await redis.set(
+  await store.set(
     `${CONNECT_TOKEN_PREFIX}${token}`,
     structuredClone(payload),
-    { ex: CONNECT_TOKEN_TTL_SECONDS },
+    CONNECT_TOKEN_TTL_SECONDS,
   );
   return token;
 };
@@ -55,9 +94,9 @@ export const consumeTelegramConnectToken = async (
 ): Promise<TelegramConnectPayload | null> => {
   if (!token) return null;
   const key = `${CONNECT_TOKEN_PREFIX}${token}`;
-  const payload = await redis.get<TelegramConnectPayload>(key);
+  const payload = await store.get<TelegramConnectPayload>(key);
   if (payload) {
-    await redis.del(key);
+    await store.del(key);
     return payload;
   }
   return null;
@@ -75,9 +114,7 @@ export const createIntervalsOAuthState = async (
     ...payload,
     createdAt: new Date().toISOString(),
   };
-  await redis.set(`${OAUTH_STATE_PREFIX}${state}`, record, {
-    ex: OAUTH_STATE_TTL_SECONDS,
-  });
+  await store.set(`${OAUTH_STATE_PREFIX}${state}`, record, OAUTH_STATE_TTL_SECONDS);
   return state;
 };
 
@@ -86,9 +123,9 @@ export const consumeIntervalsOAuthState = async (
 ): Promise<OAuthStatePayload | null> => {
   if (!state) return null;
   const key = `${OAUTH_STATE_PREFIX}${state}`;
-  const payload = await redis.get<OAuthStatePayload>(key);
+  const payload = await store.get<OAuthStatePayload>(key);
   if (payload) {
-    await redis.del(key);
+    await store.del(key);
     return payload;
   }
   return null;
@@ -108,7 +145,7 @@ export type TelegramIntervalsCredential = {
 export const saveTelegramIntervalsCredential = async (
   credential: TelegramIntervalsCredential,
 ): Promise<void> => {
-  await redis.set(
+  await store.set(
     `${TELEGRAM_TOKEN_PREFIX}${credential.telegramUserId}`,
     structuredClone(credential),
   );
@@ -117,7 +154,7 @@ export const saveTelegramIntervalsCredential = async (
 export const getTelegramIntervalsCredential = async (
   telegramUserId: number,
 ): Promise<TelegramIntervalsCredential | null> => {
-  const credential = await redis.get<TelegramIntervalsCredential>(
+  const credential = await store.get<TelegramIntervalsCredential>(
     `${TELEGRAM_TOKEN_PREFIX}${telegramUserId}`,
   );
   if (!credential) return null;

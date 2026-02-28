@@ -20,6 +20,11 @@ import { UpstashSession } from "../lib/upstash-session";
 import { getFinalResponseText } from "../lib/run-stream-utils";
 import { withSessionContext } from "../lib/session-context";
 import isProduction from "../lib/environment";
+import {
+  appendMessage,
+  getOrCreateTelegramThread,
+  getUserIdByTelegramUserId,
+} from "../lib/web-data-store";
 
 type TelegramUser = {
   id: number;
@@ -217,6 +222,35 @@ export type TelegramQueuePayload = {
 };
 
 const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
+  const mirrorTelegramMessage = async (
+    message: TelegramMessage,
+    role: "user" | "assistant",
+    content: string,
+  ) => {
+    if (!message.from?.id || !content.trim()) return;
+    const userId = await getUserIdByTelegramUserId(message.from.id);
+    if (!userId) return;
+    const chatKey = getChatKey(message.chat.id, message.message_thread_id);
+    const title =
+      message.chat.title ||
+      message.chat.username ||
+      [message.from.first_name, message.from.last_name].filter(Boolean).join(" ").trim() ||
+      `Telegram ${message.chat.id}`;
+    const thread = await getOrCreateTelegramThread(userId, chatKey, title);
+    await appendMessage(thread.id, {
+      threadId: thread.id,
+      role,
+      content: content.trim(),
+      source: role === "assistant" ? "telegram_assistant" : "telegram_user",
+      createdAt: new Date((message.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
+      meta: {
+        chatId: message.chat.id,
+        messageId: message.message_id,
+        messageThreadId: message.message_thread_id ?? null,
+      },
+    });
+  };
+
   const handleCommand = async (
     chatId: number,
     key: string,
@@ -396,6 +430,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
     const state = ensureSessionState(chatKey);
     await syncIntervalsCredential(state, message.from);
     await ensureIntervalsInstruction(state);
+    await mirrorTelegramMessage(message, "user", text);
 
     try {
       const sessionId = await state.session.getSessionId();
@@ -408,6 +443,7 @@ const createTelegramUpdateProcessor = (apiBaseUrl: string) => {
       const reply = (await getFinalResponseText(result)).trim();
       if (reply) {
         await sendTextResponse(apiBaseUrl, message.chat.id, reply, message.message_id);
+        await mirrorTelegramMessage(message, "assistant", reply);
       }
       console.log(`[Telegram] Finished update ${update.update_id}`);
     } catch (error) {

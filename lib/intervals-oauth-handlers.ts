@@ -4,6 +4,7 @@ import {
   createIntervalsOAuthState,
   saveTelegramIntervalsCredential,
 } from "./intervals-oauth-store";
+import { linkTelegramUserToUser, upsertUserFromIntervals } from "./web-data-store";
 
 const INTERVALS_AUTHORIZE_URL = "https://intervals.icu/oauth/authorize";
 const INTERVALS_TOKEN_URL = "https://intervals.icu/api/oauth/token";
@@ -220,6 +221,20 @@ export const handleIntervalsCallback = async (request: Request) => {
     tokenType: typeof payload.token_type === "string" ? payload.token_type : "Bearer",
     updatedAt: new Date().toISOString(),
   });
+
+  try {
+    const user = await upsertUserFromIntervals({
+      athleteId,
+      athleteName: payload.athlete?.name ?? null,
+      accessToken,
+      scope: typeof payload.scope === "string" ? payload.scope : "",
+      tokenType: typeof payload.token_type === "string" ? payload.token_type : "Bearer",
+      updatedAt: new Date().toISOString(),
+    });
+    await linkTelegramUserToUser(state.telegramUserId, user.id);
+  } catch (error) {
+    console.error("Failed to link Telegram credential to web user", error);
+  }
 
   return htmlResponse(
     "Dolor is connected",

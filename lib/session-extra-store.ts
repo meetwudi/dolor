@@ -19,12 +19,17 @@ const DEFAULT_KEY_PREFIX = "agent-session-extra:";
 const DEFAULT_TTL_SECONDS: number | undefined = isProduction() ? undefined : 600;
 
 export class SessionExtraStore {
-  private readonly redis: Redis;
+  private readonly redis?: Redis;
+  private readonly memory: Map<string, SessionExtraRecord>;
   private readonly keyPrefix: string;
   private readonly ttlSeconds?: number;
 
   constructor(options: SessionExtraStoreOptions = {}) {
-    this.redis = options.redis ?? Redis.fromEnv();
+    const hasRedisEnv =
+      !!(Bun.env.KV_REST_API_URL || Bun.env.KV_URL || Bun.env.REDIS_URL) &&
+      !!(Bun.env.KV_REST_API_TOKEN || Bun.env.KV_REST_API_READ_ONLY_TOKEN);
+    this.redis = options.redis ?? (hasRedisEnv ? Redis.fromEnv() : undefined);
+    this.memory = new Map();
     this.keyPrefix = options.keyPrefix ?? DEFAULT_KEY_PREFIX;
     this.ttlSeconds = options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
   }
@@ -35,7 +40,10 @@ export class SessionExtraStore {
 
   async get(sessionId: string): Promise<SessionExtraRecord | null> {
     if (!sessionId) return null;
-    const data = await this.redis.get<SessionExtraRecord>(this.buildKey(sessionId));
+    const key = this.buildKey(sessionId);
+    const data = this.redis
+      ? await this.redis.get<SessionExtraRecord>(key)
+      : ((this.memory.get(key) as SessionExtraRecord | undefined) ?? null);
     if (!data || typeof data !== "object") return null;
     return {
       data: { ...(data.data ?? {}) },
@@ -48,11 +56,16 @@ export class SessionExtraStore {
       data: structuredClone(data),
       updatedAt: new Date().toISOString(),
     };
-    await this.redis.set(
-      this.buildKey(sessionId),
-      payload,
-      this.ttlSeconds ? { ex: this.ttlSeconds } : undefined,
-    );
+    const key = this.buildKey(sessionId);
+    if (this.redis) {
+      await this.redis.set(
+        key,
+        payload,
+        this.ttlSeconds ? { ex: this.ttlSeconds } : undefined,
+      );
+    } else {
+      this.memory.set(key, payload);
+    }
     return payload;
   }
 
@@ -63,7 +76,12 @@ export class SessionExtraStore {
   }
 
   async delete(sessionId: string): Promise<void> {
-    await this.redis.del(this.buildKey(sessionId));
+    const key = this.buildKey(sessionId);
+    if (this.redis) {
+      await this.redis.del(key);
+    } else {
+      this.memory.delete(key);
+    }
   }
 }
 
