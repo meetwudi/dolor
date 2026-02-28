@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "outputDirectory": "dist",
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "bunVersion": "1.x",
@@ -21,12 +22,32 @@
       "destination": "/api/telegram"
     },
     {
+      "source": "/api/web/:path*",
+      "destination": "/api/web/:path*"
+    },
+    {
+      "source": "/auth/web/login",
+      "destination": "/api/web/auth/login"
+    },
+    {
+      "source": "/auth/web/callback",
+      "destination": "/api/web/auth/callback"
+    },
+    {
       "source": "/connect",
       "destination": "/api/connect"
     },
     {
       "source": "/auth/intervals/callback",
       "destination": "/api/intervals-callback"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }

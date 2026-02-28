@@ -391,3 +391,44 @@ export const handleStreamMessageRequest = async (
     },
   });
 };
+
+export const handleWebApiRequest = async (request: Request) => {
+  const url = new URL(request.url);
+  const { pathname } = url;
+  const method = request.method.toUpperCase();
+
+  if (pathname === "/api/web/me" && method === "GET") {
+    return handleMeRequest(request);
+  }
+  if (pathname === "/api/web/logout" && method === "POST") {
+    return handleLogoutRequest(request);
+  }
+  if (pathname === "/api/web/threads" && method === "GET") {
+    return handleListThreadsRequest(request);
+  }
+  if (pathname === "/api/web/threads" && method === "POST") {
+    return handleCreateThreadRequest(request);
+  }
+
+  const threadMatch = pathname.match(/^\/api\/web\/threads\/([^/]+)$/);
+  if (threadMatch && method === "PATCH") {
+    return handlePatchThreadRequest(request, decodeURIComponent(threadMatch[1] ?? ""));
+  }
+
+  const messagesMatch = pathname.match(/^\/api\/web\/threads\/([^/]+)\/messages$/);
+  if (messagesMatch && method === "GET") {
+    return handleThreadMessagesRequest(request, decodeURIComponent(messagesMatch[1] ?? ""));
+  }
+
+  const streamMatch = pathname.match(
+    /^\/api\/web\/threads\/([^/]+)\/messages\/stream$/,
+  );
+  if (streamMatch && method === "POST") {
+    return handleStreamMessageRequest(
+      request,
+      decodeURIComponent(streamMatch[1] ?? ""),
+    );
+  }
+
+  return json({ error: "Not Found" }, 404);
+};
