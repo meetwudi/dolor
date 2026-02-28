@@ -330,27 +330,25 @@ export function App() {
         <div className="welcome-wrap">
           <div className="auth-card">
             <p className="eyebrow">Dolor</p>
-            <h1>Your training co-pilot, now on web.</h1>
-            <p>
-              Ask questions, review sessions, and get coaching guidance with live streaming responses.
-            </p>
+            <h1>Dolor is pain in Spanish.</h1>
+            <p>Training chat.</p>
             <a className="primary-button" href="/auth/web/login">
-              Continue with Intervals
+              Sign in with Intervals
             </a>
-            <p className="auth-note">Sign in takes a few seconds and keeps your athlete context linked.</p>
+            <p className="auth-note">Sign in to continue.</p>
           </div>
           <div className="welcome-points">
             <article>
-              <h2>Live responses</h2>
-              <p>See Dolor think and respond in real time instead of waiting for long blocks.</p>
+              <h2>Ask</h2>
+              <p>Talk to Dolor about training, recovery, and workouts.</p>
             </article>
             <article>
-              <h2>Organized threads</h2>
-              <p>Keep race prep, recovery questions, and workout analysis in separate conversations.</p>
+              <h2>Threads</h2>
+              <p>Keep topics organized across separate conversations.</p>
             </article>
             <article>
-              <h2>Built for phone + desktop</h2>
-              <p>Fast, full-screen chat UX that feels natural on mobile and roomy on larger screens.</p>
+              <h2>Simple</h2>
+              <p>Mobile-friendly chat with no extra steps.</p>
             </article>
           </div>
         </div>
