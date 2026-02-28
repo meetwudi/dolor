@@ -23,15 +23,15 @@
     },
     {
       "source": "/api/web/:path*",
-      "destination": "/api/web/:path*"
+      "destination": "/api/web?path=:path*"
     },
     {
       "source": "/auth/web/login",
-      "destination": "/api/web/auth/login"
+      "destination": "/api/web?path=auth/login"
     },
     {
       "source": "/auth/web/callback",
-      "destination": "/api/web/auth/callback"
+      "destination": "/api/web?path=auth/callback"
     },
     {
       "source": "/connect",
