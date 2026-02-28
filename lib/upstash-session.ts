@@ -8,21 +8,25 @@ type UpstashSessionOptions = {
   redis?: Redis;
   keyPrefix?: string;
   ttlSeconds?: number;
+  maxItems?: number;
 };
 
 const DEFAULT_KEY_PREFIX = "agent-session:";
+const DEFAULT_MAX_ITEMS = 60;
 
 export class UpstashSession implements Session {
   private readonly redis: Redis;
   private readonly sessionId: string;
   private readonly key: string;
   private readonly ttlSeconds?: number;
+  private readonly maxItems: number;
 
   constructor(options: UpstashSessionOptions = {}) {
     this.sessionId = options.sessionId ?? randomUUID();
     this.redis = options.redis ?? Redis.fromEnv();
     this.key = `${options.keyPrefix ?? DEFAULT_KEY_PREFIX}${this.sessionId}`;
     this.ttlSeconds = options.ttlSeconds;
+    this.maxItems = options.maxItems ?? DEFAULT_MAX_ITEMS;
   }
 
   async getSessionId(): Promise<string> {
@@ -31,7 +35,7 @@ export class UpstashSession implements Session {
 
   async getItems(limit?: number): Promise<AgentInputItem[]> {
     const items = await this.readItems();
-    if (limit === undefined) {
+    if (limit === undefined || limit >= this.maxItems) {
       return items;
     }
     if (limit <= 0) {
@@ -64,19 +68,29 @@ export class UpstashSession implements Session {
   private async readItems(): Promise<AgentInputItem[]> {
     const data = await this.redis.get<AgentInputItem[]>(this.key);
     if (!Array.isArray(data)) return [];
-    return cleanHistoryItems(data);
+    return this.keepMostRecent(cleanHistoryItems(data));
   }
 
   private async writeItems(items: AgentInputItem[]): Promise<void> {
-    if (!items.length) {
+    const sanitized = this.keepMostRecent(cleanHistoryItems(items));
+    if (!sanitized.length) {
       await this.redis.del(this.key);
       return;
     }
-    const sanitized = cleanHistoryItems(items);
     await this.redis.set(
       this.key,
       sanitized.map((item) => structuredClone(item)),
       this.ttlSeconds ? { ex: this.ttlSeconds } : undefined,
     );
+  }
+
+  private keepMostRecent(items: AgentInputItem[]): AgentInputItem[] {
+    if (this.maxItems <= 0) {
+      return [];
+    }
+    if (items.length <= this.maxItems) {
+      return items;
+    }
+    return items.slice(items.length - this.maxItems);
   }
 }
