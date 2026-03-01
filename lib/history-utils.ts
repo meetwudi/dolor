@@ -44,21 +44,45 @@ const dropLargeToolOutputs = (items: AgentInputItem[]) =>
 const dropReasoningItems = (items: AgentInputItem[]) =>
   items.filter((item) => item?.type !== "reasoning");
 
+const recursivelyStripReasoningKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => recursivelyStripReasoningKeys(entry));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  const next: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    const normalized = key.toLowerCase();
+    if (
+      normalized === "reasoning" ||
+      normalized === "reasoning_id" ||
+      normalized === "reasoningid" ||
+      normalized.includes("reasoning")
+    ) {
+      continue;
+    }
+    next[key] = recursivelyStripReasoningKeys(nested);
+  }
+  return next;
+};
+
 const stripReasoningReferences = (item: AgentInputItem) => {
-  const cloned = structuredClone(item);
+  const cloned = recursivelyStripReasoningKeys(structuredClone(item)) as Record<
+    string,
+    unknown
+  >;
   if (!cloned || typeof cloned !== "object") {
-    return cloned;
+    return cloned as AgentInputItem;
   }
-  if ("reasoning" in cloned) {
-    delete (cloned as { reasoning?: unknown }).reasoning;
+
+  // Message IDs can carry hard dependencies on reasoning items (rs_*).
+  // Keep tool/call IDs intact for function_call_output pairing.
+  const type = typeof cloned.type === "string" ? cloned.type : "";
+  if (type === "message" && "id" in cloned) {
+    delete cloned.id;
   }
-  if ("reasoning_id" in cloned) {
-    delete (cloned as { reasoning_id?: unknown }).reasoning_id;
-  }
-  if ("reasoningId" in cloned) {
-    delete (cloned as { reasoningId?: unknown }).reasoningId;
-  }
-  return cloned;
+  return cloned as AgentInputItem;
 };
 
 export const cleanHistoryItems = (items: AgentInputItem[]): AgentInputItem[] =>

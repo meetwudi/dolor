@@ -49,12 +49,9 @@ describe("cleanHistoryItems", () => {
       id: "msg_1",
     } as any;
     const cleaned = cleanHistoryItems([message]);
-    expect(cleaned[0]).toEqual({
-      ...buildAssistantMessage("with plan"),
-      id: "msg_1",
-    });
+    expect(cleaned[0]).toEqual(buildAssistantMessage("with plan"));
     expect((cleaned[0] as any).reasoning).toBeUndefined();
-    expect((cleaned[0] as any).id).toBe("msg_1");
+    expect((cleaned[0] as any).id).toBeUndefined();
   });
 
   test("removes reasoning references from tool calls", () => {
@@ -71,6 +68,24 @@ describe("cleanHistoryItems", () => {
       id: "call_1",
     });
     expect((cleaned[0] as any).id).toBe("call_1");
+  });
+
+  test("strips nested reasoning keys deeply", () => {
+    const item: AgentInputItem = {
+      type: "message",
+      role: "assistant",
+      id: "msg_nested",
+      content: [{ type: "output_text", text: "ok" }],
+      metadata: {
+        nestedReasoningId: "rs_abc",
+        child: { reasoning_id: "rs_xyz", keep: "yes" },
+      },
+    } as any;
+    const cleaned = cleanHistoryItems([item])[0] as any;
+    expect(cleaned.id).toBeUndefined();
+    expect(cleaned.metadata?.nestedReasoningId).toBeUndefined();
+    expect(cleaned.metadata?.child?.reasoning_id).toBeUndefined();
+    expect(cleaned.metadata?.child?.keep).toBe("yes");
   });
 
   test("returns cloned items so callers cannot mutate the stored history", () => {
