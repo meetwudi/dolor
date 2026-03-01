@@ -76,6 +76,25 @@ export const sendResponse = async (res: NodeResponse, response: Response) => {
   response.headers.forEach((value, key) => {
     res.setHeader(key, value);
   });
-  const buffer = Buffer.from(await response.arrayBuffer());
-  res.send(buffer);
+
+  if (!response.body) {
+    res.end();
+    return;
+  }
+
+  const reader = response.body.getReader();
+  try {
+    if (typeof (res as any).flushHeaders === "function") {
+      (res as any).flushHeaders();
+    }
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.length) {
+        res.write(Buffer.from(value));
+      }
+    }
+  } finally {
+    res.end();
+  }
 };
