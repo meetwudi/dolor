@@ -31,9 +31,19 @@ type Store = {
   del: (key: string) => Promise<void>;
 };
 
+const getEnv = (key: string) => {
+  if (typeof Bun !== "undefined" && Bun.env[key] !== undefined) {
+    return Bun.env[key];
+  }
+  if (typeof process !== "undefined" && process.env[key] !== undefined) {
+    return process.env[key];
+  }
+  return undefined;
+};
+
 const hasRedisEnv = () =>
-  !!(Bun.env.KV_REST_API_URL || Bun.env.KV_URL || Bun.env.REDIS_URL) &&
-  !!(Bun.env.KV_REST_API_TOKEN || Bun.env.KV_REST_API_READ_ONLY_TOKEN);
+  !!(getEnv("KV_REST_API_URL") || getEnv("KV_URL") || getEnv("REDIS_URL")) &&
+  !!(getEnv("KV_REST_API_TOKEN") || getEnv("KV_REST_API_READ_ONLY_TOKEN"));
 
 const memory = new Map<string, unknown>();
 

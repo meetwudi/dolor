@@ -18,6 +18,16 @@ const DEFAULT_KEY_PREFIX = "agent-session-extra:";
 
 const DEFAULT_TTL_SECONDS: number | undefined = isProduction() ? undefined : 600;
 
+const getEnv = (key: string) => {
+  if (typeof Bun !== "undefined" && Bun.env[key] !== undefined) {
+    return Bun.env[key];
+  }
+  if (typeof process !== "undefined" && process.env[key] !== undefined) {
+    return process.env[key];
+  }
+  return undefined;
+};
+
 export class SessionExtraStore {
   private readonly redis?: Redis;
   private readonly memory: Map<string, SessionExtraRecord>;
@@ -26,8 +36,8 @@ export class SessionExtraStore {
 
   constructor(options: SessionExtraStoreOptions = {}) {
     const hasRedisEnv =
-      !!(Bun.env.KV_REST_API_URL || Bun.env.KV_URL || Bun.env.REDIS_URL) &&
-      !!(Bun.env.KV_REST_API_TOKEN || Bun.env.KV_REST_API_READ_ONLY_TOKEN);
+      !!(getEnv("KV_REST_API_URL") || getEnv("KV_URL") || getEnv("REDIS_URL")) &&
+      !!(getEnv("KV_REST_API_TOKEN") || getEnv("KV_REST_API_READ_ONLY_TOKEN"));
     this.redis = options.redis ?? (hasRedisEnv ? Redis.fromEnv() : undefined);
     this.memory = new Map();
     this.keyPrefix = options.keyPrefix ?? DEFAULT_KEY_PREFIX;
