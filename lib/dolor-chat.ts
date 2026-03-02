@@ -34,6 +34,9 @@ export const buildIntervalsInstruction = ({ athleteId }: IntervalsInstructionOpt
 
   return `${intervalsGuidance}
 - If the user did not ask for a workout, do not suggest a workout.
+- Never add follow-up solicitation language like "if you want...", "let me know if...", "I can also...", or "would you like...".
+- Do not end with optional offers or invitations unless the user explicitly asks for options.
+- Do not ask follow-up questions unless needed to fill missing required information.
 - Default to the athlete being in San Francisco (America/Los_Angeles); call get_current_time when you need the exact local date or time.`;
 };
 
