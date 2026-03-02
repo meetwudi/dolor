@@ -371,7 +371,10 @@ export function App() {
                   <span className="thread-title">{thread.title}</span>
                   {thread.sourceType === "telegram" && <span className="thread-tag">Telegram</span>}
                 </div>
-                <span className="thread-meta">{thread.messageCount} messages</span>
+                <span className="thread-meta">
+                  {thread.messageCount} messages
+                  {thread.readOnly ? " \u2022 Read-only" : ""}
+                </span>
               </button>
               {!thread.readOnly && (
                 <div className="thread-inline-actions">
@@ -395,11 +398,6 @@ export function App() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
-              )}
-              {thread.readOnly && (
-                <div className="thread-inline-actions">
-                  <span className="thread-readonly-label">Read-only</span>
                 </div>
               )}
             </div>

@@ -158,16 +158,22 @@ body {
   text-align: left;
   padding: 0;
   cursor: pointer;
+  width: 100%;
+  min-width: 0;
 }
 
 .thread-title-row {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .thread-title {
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .thread-tag {
@@ -186,11 +192,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-}
-
-.thread-readonly-label {
-  font-size: 0.72rem;
-  color: var(--muted);
 }
 
 .chat-main {
