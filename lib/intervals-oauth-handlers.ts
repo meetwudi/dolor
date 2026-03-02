@@ -11,13 +11,8 @@ const INTERVALS_TOKEN_URL = "https://intervals.icu/api/oauth/token";
 const INTERVALS_SCOPES = "ACTIVITY:READ,WELLNESS:READ,CALENDAR:READ";
 
 const getEnv = (key: string) => {
-  if (typeof Bun !== "undefined" && Bun.env[key] !== undefined) {
-    return Bun.env[key];
-  }
-  if (typeof process !== "undefined" && process.env[key] !== undefined) {
-    return process.env[key];
-  }
-  return undefined;
+  if (typeof process === "undefined") return undefined;
+  return process.env[key];
 };
 
 const normalizeBaseUrl = (value?: string | null) => {

@@ -19,13 +19,8 @@ const DEFAULT_KEY_PREFIX = "agent-session-extra:";
 const DEFAULT_TTL_SECONDS: number | undefined = isProduction() ? undefined : 600;
 
 const getEnv = (key: string) => {
-  if (typeof Bun !== "undefined" && Bun.env[key] !== undefined) {
-    return Bun.env[key];
-  }
-  if (typeof process !== "undefined" && process.env[key] !== undefined) {
-    return process.env[key];
-  }
-  return undefined;
+  if (typeof process === "undefined") return undefined;
+  return process.env[key];
 };
 
 export class SessionExtraStore {

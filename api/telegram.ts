@@ -6,8 +6,13 @@ import {
   type NodeResponse,
 } from "../lib/vercel-request";
 
-const botToken = Bun.env.TELEGRAM_BOT_TOKEN ?? "";
-const secretToken = Bun.env.TELEGRAM_SECRET_TOKEN;
+const getEnv = (key: string) => {
+  if (typeof process === "undefined") return undefined;
+  return process.env[key];
+};
+
+const botToken = getEnv("TELEGRAM_BOT_TOKEN") ?? "";
+const secretToken = getEnv("TELEGRAM_SECRET_TOKEN");
 
 const webhookHandler = createTelegramWebhookHandler({
   botToken,

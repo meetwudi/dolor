@@ -18,9 +18,8 @@ type WebOAuthState = {
 };
 
 const getEnv = (key: string) => {
-  if (typeof Bun !== "undefined" && Bun.env[key] !== undefined) return Bun.env[key];
-  if (typeof process !== "undefined" && process.env[key] !== undefined) return process.env[key];
-  return undefined;
+  if (typeof process === "undefined") return undefined;
+  return process.env[key];
 };
 
 const hasRedisEnv = () =>
